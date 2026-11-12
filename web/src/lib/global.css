@@ -1,0 +1,98 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+@import "@fontsource/poppins";
+@import "@fontsource-variable/geist-mono";
+
+:root {
+	color-scheme: light dark;
+	accent-color: var(--color-primary);
+	scrollbar-color: var(--color-edge) transparent;
+	scrollbar-gutter: stable;
+	scroll-padding-top: --spacing(6);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	:root {
+		scroll-behavior: smooth;
+	}
+}
+
+@theme {
+	--font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: "Geist Mono", ui-monospace, monospace;
+
+	--color-background: light-dark(#f4f4fc, #0e0e18);
+	--color-foreground: light-dark(#2a294b, #e2e2f8);
+	--color-muted-foreground: light-dark(#6b6b8b, #a1a1c3);
+
+	--color-border: light-dark(#e0e0ee, #313153);
+	--color-edge: light-dark(#8585ad, #6a6aa0);
+
+	--color-primary: #cc99ff;
+	--color-primary-foreground: light-dark(#2a294b, #0e0e18);
+	--color-link: light-dark(#6e55cf, #cc99ff);
+
+	--color-destructive: light-dark(#c4153a, #ff9aa8);
+	--color-success: light-dark(#0a6a3a, #7be0b0);
+}
+
+@layer base {
+	* {
+		@apply border-border;
+	}
+
+	html {
+		@apply bg-background;
+		min-height: 100%;
+		-webkit-text-size-adjust: 100%;
+	}
+	body {
+		@apply bg-background font-sans text-foreground;
+		min-height: 100dvh;
+		padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+			env(safe-area-inset-left);
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+	}
+	a {
+		@apply text-link underline;
+	}
+	input:is(
+		:not([type]),
+		[type="text"],
+		[type="email"],
+		[type="password"],
+		[type="search"],
+		[type="tel"],
+		[type="url"],
+		[type="number"],
+		[type="date"],
+		[type="datetime-local"],
+		[type="month"],
+		[type="time"],
+		[type="week"]
+	),
+	textarea,
+	select {
+		@apply border-edge bg-transparent px-3 py-2 placeholder:text-muted-foreground focus:border-primary focus:ring-primary;
+	}
+	button[type="submit"] {
+		@apply cursor-pointer bg-primary px-4 py-2 font-medium text-primary-foreground hover:brightness-110;
+	}
+	::selection {
+		background: color-mix(in oklab, var(--color-primary) 50%, transparent);
+	}
+}
+
+@utility dash-shade-* {
+	--dash-angle: -45deg;
+	--dash-size: --spacing(--value(integer, --default(1.5)));
+	background-image: repeating-linear-gradient(
+		var(--dash-angle),
+		var(--color-border) 0,
+		var(--color-border) var(--dash-size),
+		var(--color-background) var(--dash-size),
+		var(--color-background) calc(var(--dash-size) * 2)
+	);
+}
