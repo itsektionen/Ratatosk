@@ -1,0 +1,28 @@
+services:
+  ratatosk:
+    build: .
+    restart: unless-stopped
+    environment:
+      BASE_DOMAIN: ${BASE_DOMAIN:?set BASE_DOMAIN in .env}
+      MAX_UPLOAD: ${MAX_UPLOAD:-52428800}
+      MAX_UNZIPPED: ${MAX_UNZIPPED:-209715200}
+      MAX_FILES: ${MAX_FILES:-10000}
+    volumes:
+      - sites:/var/www/html
+    networks:
+      - traefik
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_NETWORK:-traefik}
+      traefik.http.routers.ratatosk.rule: Host(`${BASE_DOMAIN}`) || HostRegexp(`^.+\.${BASE_DOMAIN}$$`)
+      traefik.http.routers.ratatosk.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.ratatosk.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      traefik.http.services.ratatosk.loadbalancer.server.port: "8000"
+
+volumes:
+  sites:
+
+networks:
+  traefik:
+    name: ${TRAEFIK_NETWORK:-traefik}
+    external: true
