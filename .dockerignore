@@ -2,4 +2,8 @@ web/node_modules
 web/build
 web/.svelte-kit
 .git
+.direnv
+result
+flake.*
 .env*
+.sites

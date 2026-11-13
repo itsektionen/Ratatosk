@@ -96,7 +96,7 @@ func unpack(cfg Config, dst string, src io.Reader) error {
 	}
 }
 
-// zipping a folder usually wraps everything in a directory, 
+// zipping a folder usually wraps everything in a directory,
 // so we go into it if there is nothing else at the top
 func siteRoot(dir string) (string, error) {
 	for range 2 {

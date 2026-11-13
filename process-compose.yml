@@ -1,0 +1,8 @@
+version: "0.5"
+
+processes:
+  backend:
+    command: go run . serve-app
+  web:
+    command: npm run dev
+    working_dir: ./web
