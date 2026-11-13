@@ -23,7 +23,12 @@
 			"lg:sticky lg:top-0 lg:h-dvh lg:w-90 lg:overflow-y-auto lg:overscroll-contain lg:border-r lg:pr-3",
 		]}
 	>
-		<form method="POST" enctype="multipart/form-data" class="flex flex-col gap-4">
+		<form
+			method="POST"
+			action="/api/sites"
+			enctype="multipart/form-data"
+			class="flex flex-col gap-4"
+		>
 			<label
 				class={[
 					"flex items-center border border-edge px-3",
