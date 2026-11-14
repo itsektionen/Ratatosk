@@ -25,7 +25,7 @@
 	>
 		<form
 			method="POST"
-			action="/api/sites"
+			action="/api/upload"
 			enctype="multipart/form-data"
 			class="flex flex-col gap-4"
 		>

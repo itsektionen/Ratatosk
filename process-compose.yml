@@ -3,6 +3,9 @@ version: "0.5"
 processes:
   backend:
     command: go run . serve-app
+    environment:
+      - ADDR=127.0.0.1:8000 # keep in sync with web/vite.config.ts
+      - SITES_DIR=.sites
   web:
     command: npm run dev
     working_dir: ./web

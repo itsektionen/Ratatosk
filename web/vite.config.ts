@@ -6,8 +6,8 @@ import Icons from "unplugin-icons/vite";
 
 export default defineConfig({
 	server: {
-		// Forward API calls to the Go backend from the dev server
-		proxy: { "/api": "http://127.0.0.1:8080" },
+		// Forward API calls to the Go backend
+		proxy: { "/api": "http://127.0.0.1:8000" },
 	},
 	plugins: [
 		tailwindcss(),

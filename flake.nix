@@ -17,11 +17,6 @@
     {
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
-          # process-compose serves its own API on 8080 by default, which the backend uses
-          PC_PORT_NUM = "8099";
-          # otherwise it may pick up the Docker compose.yml
-          PC_CONFIG_FILES = "process-compose.yml";
-
           packages = [
             pkgs.go_1_27
             pkgs.gopls
