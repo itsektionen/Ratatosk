@@ -60,7 +60,7 @@
 			"content-start gap-4 p-6 max-lg:pt-3 lg:pl-3",
 		]}
 	>
-		{#each Array(10) as _, i (i)}
+		{#each Array(0) as _, i (i)}
 			<SiteCard
 				subdomain="example"
 				url="https://example.com"

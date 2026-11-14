@@ -26,44 +26,52 @@ func userErrorf(format string, a ...any) error {
 func Deploy(cfg Config, subdomain string, file multipart.File, header *multipart.FileHeader) error {
 	tmp, err := os.MkdirTemp(cfg.SitesDir, ".upload-*")
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("sites directory %q was removed while running: %w", cfg.SitesDir, err)
+		}
 		return err
 	}
 	defer os.RemoveAll(tmp)
 
+	staging := filepath.Join(tmp, "new")
+	if err := os.Mkdir(staging, dirPerm); err != nil {
+		return err
+	}
+
 	switch strings.ToLower(filepath.Ext(header.Filename)) {
 	case ".html", ".htm":
-		err = saveIndex(filepath.Join(tmp, "index.html"), file, cfg.MaxUnzipped)
+		err = saveIndex(cfg, filepath.Join(staging, "index.html"), file)
 	default:
-		err = unpack(cfg, tmp, file)
+		err = unpack(cfg, staging, file)
 	}
 	if err != nil {
 		return err
 	}
 
-	root, err := siteRoot(tmp)
+	if err := checkTree(staging); err != nil {
+		return err
+	}
+	siteDir, err := findIndexDir(staging)
 	if err != nil {
 		return err
 	}
-	if err := checkTree(root); err != nil {
-		return err
-	}
-	return swap(cfg.SitesDir, subdomain, root)
+	return swap(filepath.Join(cfg.SitesDir, subdomain), siteDir, filepath.Join(tmp, "old"))
 }
 
-func saveIndex(dst string, src io.Reader, limit int64) error {
-	f, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, filePerm)
+func saveIndex(cfg Config, dst string, src io.Reader) error {
+	file, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, filePerm)
 	if err != nil {
 		return err
 	}
 	// Read one past the limit so we can tell if we are exactly at it or over
-	n, err := io.Copy(f, io.LimitReader(src, limit+1))
-	if cerr := f.Close(); err == nil {
+	n, err := io.Copy(file, io.LimitReader(src, cfg.MaxUnzipped+1))
+	if cerr := file.Close(); err == nil {
 		err = cerr
 	}
 	if err != nil {
 		return err
 	}
-	if n > limit {
+	if n > cfg.MaxUnzipped {
 		return userErrorf("file too large")
 	}
 	return nil
@@ -96,30 +104,6 @@ func unpack(cfg Config, dst string, src io.Reader) error {
 	}
 }
 
-// zipping a folder usually wraps everything in a directory,
-// so we go into it if there is nothing else at the top
-func siteRoot(dir string) (string, error) {
-	for range 2 {
-		if isRegular(filepath.Join(dir, "index.html")) {
-			return dir, nil
-		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			return "", err
-		}
-		if len(entries) != 1 || !entries[0].IsDir() {
-			break
-		}
-		dir = filepath.Join(dir, entries[0].Name())
-	}
-	return "", userErrorf("upload has no index.html at its root")
-}
-
-func isRegular(path string) bool {
-	fi, err := os.Lstat(path)
-	return err == nil && fi.Mode().IsRegular()
-}
-
 func checkTree(root string) error {
 	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -132,28 +116,42 @@ func checkTree(root string) error {
 	})
 }
 
-// swap atomically replaces SitesDir/subdomain with root, keeping the old
-// version around until the new one is in place so it can be restored
-func swap(sitesDir, subdomain, root string) error {
-	final := filepath.Join(sitesDir, subdomain)
-
-	old, err := os.MkdirTemp(sitesDir, ".old-*")
-	if err != nil {
-		return err
+// Archives often wrap everything in a single folder. Unwrap it
+func findIndexDir(dir string) (string, error) {
+	if hasIndex(dir) {
+		return dir, nil
 	}
-	defer os.RemoveAll(old)
-	backup := filepath.Join(old, "site")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+	if len(entries) == 1 && entries[0].IsDir() {
+		if inner := filepath.Join(dir, entries[0].Name()); hasIndex(inner) {
+			return inner, nil
+		}
+	}
+	return "", userErrorf("upload has no index.html at its root")
+}
 
+// Does not consider symlinks. Safe only after checkTree
+func hasIndex(dir string) bool {
+	fi, err := os.Stat(filepath.Join(dir, "index.html"))
+	return err == nil && !fi.IsDir()
+}
+
+// swap replaces live with next, parking the old version at prev to be restored 
+// on failiure. Note: Not atomic. Live will be gone for a moment while it swaps
+func swap(live, next, prev string) error {
 	hadOld := true
-	if err := os.Rename(final, backup); err != nil {
+	if err := os.Rename(live, prev); err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		hadOld = false
+		hadOld = false // FIrst deploy
 	}
-	if err := os.Rename(root, final); err != nil {
+	if err := os.Rename(next, live); err != nil {
 		if hadOld {
-			_ = os.Rename(backup, final) // roll back
+			err = errors.Join(err, os.Rename(prev, live))
 		}
 		return err
 	}
