@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/itsektionen/ratatosk/web"
 )
 
 func appHandler(cfg Config) http.Handler {
@@ -23,9 +24,7 @@ func appHandler(cfg Config) http.Handler {
 		api.Post("/upload", uploadHandler(cfg))
 	})
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Test"))
-	})
+	r.Handle("/*", web.Handler())
 
 	return r
 }

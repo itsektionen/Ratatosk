@@ -9,5 +9,11 @@ import (
 //go:embed all:build
 var webFS embed.FS
 
-func siteHandler() http.Handler {
+// Serves the prerendered embedded site
+func Handler() http.Handler {
+	build, err := fs.Sub(webFS, "build")
+	if err != nil {
+		panic(err)
+	}
+	return http.FileServerFS(build)
 }
