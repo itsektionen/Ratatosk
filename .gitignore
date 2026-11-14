@@ -1,5 +1,11 @@
+# Nix / direnv
 .direnv
 result
-.sites
+
+# Local dev
 .env
+.sites
+
+# Go build output
 /ratatosk
+/ratatosk.exe

@@ -1,11 +1,20 @@
 version: "0.5"
 
+# No shell override: the default shell is used (sh on Linux/macOS, cmd on Windows)
+# and every command is a plain program invocation that works in both.
 processes:
   backend:
     command: go run . serve-app
     environment:
       - ADDR=127.0.0.1:8000 # keep in sync with web/vite.config.ts
       - SITES_DIR=.sites
+    # Restart on Go changes
+    watch:
+      debounce: 500ms
+      paths:
+        - path: .
+          include: ["*.go", go.mod, go.sum]
+          exclude: [web, .sites]
   web:
     command: npm run dev
     working_dir: ./web
