@@ -23,12 +23,12 @@ func main() {
 	switch cmd {
 	case "serve":
 		prepareSitesDir(cfg.SitesDir)
-		// handler = hostRouter(cfg.BaseDomain, appHandler(cfg), sitesHandler(cfg.SitesDir, cfg.BaseDomain))
+		handler = rootHandler(cfg, appHandler(cfg), sitesHandler(cfg))
 	case "serve-app":
 		prepareSitesDir(cfg.SitesDir)
 		handler = appHandler(cfg)
 	case "serve-sites":
-		// handler = sitesHandler(cfg.SitesDir, cfg.BaseDomain)
+		handler = sitesHandler(cfg)
 	default:
 		log.Fatalf("unknown command %q (valid: serve, serve-app, serve-sites)", cmd)
 	}
@@ -43,6 +43,16 @@ func main() {
 	if err := run(srv); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func rootHandler(cfg Config, app, sites http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hostname(r) == cfg.BaseDomain {
+			app.ServeHTTP(w, r)
+			return
+		}
+		sites.ServeHTTP(w, r)
+	})
 }
 
 func run(srv *http.Server) error {

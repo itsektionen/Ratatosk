@@ -4,9 +4,10 @@ services:
     restart: unless-stopped
     environment:
       BASE_DOMAIN: ${BASE_DOMAIN:?set BASE_DOMAIN in .env}
-      MAX_UPLOAD: ${MAX_UPLOAD:-52428800}
-      MAX_UNZIPPED: ${MAX_UNZIPPED:-209715200}
-      MAX_FILES: ${MAX_FILES:-10000}
+      # Passed through from .env only if set there, defaults are in config.go
+      MAX_UPLOAD:
+      MAX_UNZIPPED:
+      MAX_FILES:
     volumes:
       - sites:/var/www/html
     networks:

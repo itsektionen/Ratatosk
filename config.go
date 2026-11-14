@@ -34,11 +34,13 @@ type Config struct {
 	MaxFiles    int64 // max number of entries in an uploaded archive
 }
 
+// Defaults are for local dev. 
+// Docker image and compose should override to be correct for prod
 func LoadConfig() Config {
 	return Config{
-		Addr:        env("ADDR", ":8000"),
-		SitesDir:    env("SITES_DIR", "/var/www/html"),
-		BaseDomain:  env("BASE_DOMAIN", "example.com"),
+		Addr:        env("ADDR", "127.0.0.1:8000"),
+		SitesDir:    env("SITES_DIR", ".sites"),
+		BaseDomain:  env("BASE_DOMAIN", "localhost"),
 		MaxUpload:   envInt64("MAX_UPLOAD", 50<<20),    // 50 MB request
 		MaxUnzipped: envInt64("MAX_UNZIPPED", 200<<20), // 200 MB total after decompression
 		MaxFiles:    envInt64("MAX_FILES", 10_000),

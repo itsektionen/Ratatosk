@@ -1,13 +1,13 @@
 version: "0.5"
 
-# No shell override: the default shell is used (sh on Linux/macOS, cmd on Windows)
-# and every command is a plain program invocation that works in both.
 processes:
   backend:
-    command: go run . serve-app
+    command: go run . serve
     environment:
       - ADDR=127.0.0.1:8000 # keep in sync with web/vite.config.ts
       - SITES_DIR=.sites
+      # Browsers resolve *.localhost, so we can test like this without DNS setup
+      - BASE_DOMAIN=localhost
     # Restart on Go changes
     watch:
       debounce: 500ms
