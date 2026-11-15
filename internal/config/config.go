@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"log"
@@ -36,7 +36,7 @@ type Config struct {
 
 // Defaults are for local dev.
 // Docker image and compose should override to be correct for prod
-func LoadConfig() Config {
+func Load() Config {
 	return Config{
 		Addr:        env("ADDR", "127.0.0.1:8000"),
 		SitesDir:    env("SITES_DIR", ".sites"),

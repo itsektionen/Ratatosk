@@ -1,17 +1,18 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
+
+	"github.com/itsektionen/ratatosk/internal/app"
+	"github.com/itsektionen/ratatosk/internal/config"
+	"github.com/itsektionen/ratatosk/internal/server"
+	"github.com/itsektionen/ratatosk/internal/sites"
 )
 
 func main() {
-	cfg := LoadConfig()
+	cfg := config.Load()
 
 	cmd := "serve"
 	if len(os.Args) > 1 {
@@ -21,47 +22,19 @@ func main() {
 	var handler http.Handler
 	switch cmd {
 	case "serve":
-		prepareSitesDir(cfg.SitesDir)
-		handler = rootHandler(cfg, appHandler(cfg), sitesHandler(cfg))
+		sites.PrepareDir(cfg.SitesDir)
+		handler = server.Root(cfg, app.Handler(cfg), server.Sites(cfg))
 	case "serve-app":
-		prepareSitesDir(cfg.SitesDir)
-		handler = appHandler(cfg)
+		sites.PrepareDir(cfg.SitesDir)
+		handler = app.Handler(cfg)
 	case "serve-sites":
-		handler = sitesHandler(cfg)
+		handler = server.Sites(cfg)
 	default:
 		log.Fatalf("unknown command %q (valid: serve, serve-app, serve-sites)", cmd)
 	}
 
-	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           handler,
-		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       2 * time.Minute,
-	}
 	log.Printf("%s listening on %s", cmd, cfg.Addr)
-	if err := run(srv); err != nil {
+	if err := server.Run(cfg.Addr, handler); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func run(srv *http.Server) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	serverErr := make(chan error, 1)
-	go func() {
-		serverErr <- srv.ListenAndServe()
-	}()
-
-	select {
-	case err := <-serverErr:
-		return err // the server died by itself
-	case <-ctx.Done():
-		log.Println("stop signal received, shutting down")
-	}
-
-	// Ongoing requests have 15 seconds to finish
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	return srv.Shutdown(shutdownCtx)
 }

@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"io"
@@ -6,16 +6,15 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/itsektionen/ratatosk/internal/config"
+	"github.com/itsektionen/ratatosk/internal/sites"
 )
 
-var dnsRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-
-func sitesHandler(cfg Config) http.Handler {
+func Sites(cfg config.Config) http.Handler {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
@@ -23,8 +22,8 @@ func sitesHandler(cfg Config) http.Handler {
 			return
 		}
 
-		name, ok := strings.CutSuffix(hostname(r), "."+cfg.BaseDomain)
-		if !ok || !dnsRe.MatchString(name) {
+		name, ok := strings.CutSuffix(Hostname(r), "."+cfg.BaseDomain)
+		if !ok || !sites.ValidName(name) {
 			http.NotFound(w, r)
 			return
 		}

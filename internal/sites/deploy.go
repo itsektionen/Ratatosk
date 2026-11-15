@@ -1,4 +1,4 @@
-package main
+package sites
 
 import (
 	"context"
@@ -10,9 +10,11 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	extract "github.com/hashicorp/go-extract"
+	"github.com/itsektionen/ratatosk/internal/config"
 )
 
 const (
@@ -22,7 +24,7 @@ const (
 	filePerm os.FileMode = 0o644
 )
 
-func prepareSitesDir(dir string) {
+func PrepareDir(dir string) {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		log.Fatal(err)
 	}
@@ -36,16 +38,24 @@ func prepareSitesDir(dir string) {
 	}
 }
 
+var dnsRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+func ValidName(name string) bool {
+	return dnsRe.MatchString(name)
+}
+
 // UserError is a problem caused by the uploaded content. 4xx not 500
 type UserError struct{ Msg string }
 
-func (e *UserError) Error() string { return e.Msg }
+func (e *UserError) Error() string {
+	return e.Msg
+}
 
 func userErrorf(format string, a ...any) error {
 	return &UserError{Msg: fmt.Sprintf(format, a...)}
 }
 
-func Deploy(cfg Config, subdomain string, file multipart.File, header *multipart.FileHeader) error {
+func Deploy(cfg config.Config, subdomain string, file multipart.File, header *multipart.FileHeader) error {
 	tmp, err := os.MkdirTemp(cfg.SitesDir, ".upload-*")
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -80,7 +90,7 @@ func Deploy(cfg Config, subdomain string, file multipart.File, header *multipart
 	return swap(filepath.Join(cfg.SitesDir, subdomain), siteDir, filepath.Join(tmp, "old"))
 }
 
-func saveIndex(cfg Config, dst string, src io.Reader) error {
+func saveIndex(cfg config.Config, dst string, src io.Reader) error {
 	file, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, filePerm)
 	if err != nil {
 		return err
@@ -99,7 +109,7 @@ func saveIndex(cfg Config, dst string, src io.Reader) error {
 	return nil
 }
 
-func unpack(cfg Config, dst string, src io.Reader) error {
+func unpack(cfg config.Config, dst string, src io.Reader) error {
 	ecfg := extract.NewConfig(
 		extract.WithMaxExtractionSize(cfg.MaxUnzipped), // zip-bomb guard
 		extract.WithMaxFiles(cfg.MaxFiles),

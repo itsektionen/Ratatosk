@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"errors"
@@ -6,9 +6,12 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/itsektionen/ratatosk/internal/config"
+	"github.com/itsektionen/ratatosk/internal/sites"
 )
 
-func uploadHandler(cfg Config) http.HandlerFunc {
+func uploadHandler(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Prevent stupid uploads
 		r.Body = http.MaxBytesReader(w, r.Body, cfg.MaxUpload)
@@ -22,7 +25,7 @@ func uploadHandler(cfg Config) http.HandlerFunc {
 		}
 
 		subdomain := strings.ToLower(strings.TrimSpace(r.FormValue("subdomain")))
-		if !dnsRe.MatchString(subdomain) {
+		if !sites.ValidName(subdomain) {
 			http.Error(w, "invalid subdomain", http.StatusBadRequest)
 			return
 		}
@@ -34,8 +37,8 @@ func uploadHandler(cfg Config) http.HandlerFunc {
 		}
 		defer file.Close()
 
-		if err := Deploy(cfg, subdomain, file, header); err != nil {
-			if ue, ok := errors.AsType[*UserError](err); ok {
+		if err := sites.Deploy(cfg, subdomain, file, header); err != nil {
+			if ue, ok := errors.AsType[*sites.UserError](err); ok {
 				http.Error(w, ue.Msg, http.StatusUnprocessableEntity)
 			} else {
 				log.Printf("deploy %q failed: %v", subdomain, err)
