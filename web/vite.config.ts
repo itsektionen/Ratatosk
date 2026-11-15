@@ -7,7 +7,9 @@ import Icons from "unplugin-icons/vite";
 export default defineConfig({
 	server: {
 		// Forward API calls to the Go backend
-		proxy: { "/api": "http://127.0.0.1:8000" },
+		proxy: {
+			"/api": { target: "http://127.0.0.1:8000", headers: { host: "localhost:8000" } },
+		},
 	},
 	plugins: [
 		tailwindcss(),
@@ -18,7 +20,7 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes("node_modules") ? undefined : true,
 			},
-			adapter: adapter(),
+			adapter: adapter({ fallback: "404.html" }),
 		}),
 	],
 });

@@ -31,6 +31,14 @@ func appHandler(cfg Config) http.Handler {
 
 var dnsRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
+func siteURL(r *http.Request, subdomain string) string {
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return scheme + "://" + subdomain + "." + r.Host + "/"
+}
+
 func uploadHandler(cfg Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Prevent stupid uploads
@@ -67,6 +75,6 @@ func uploadHandler(cfg Config) http.HandlerFunc {
 			return
 		}
 
-		fmt.Fprintf(w, `https://%s.%s/`+"\n", subdomain, cfg.BaseDomain)
+		fmt.Fprintln(w, siteURL(r, subdomain))
 	}
 }
