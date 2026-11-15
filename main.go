@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -45,16 +44,6 @@ func main() {
 	}
 }
 
-func rootHandler(cfg Config, app, sites http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if hostname(r) == cfg.BaseDomain {
-			app.ServeHTTP(w, r)
-			return
-		}
-		sites.ServeHTTP(w, r)
-	})
-}
-
 func run(srv *http.Server) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -75,25 +64,4 @@ func run(srv *http.Server) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
-}
-
-const (
-	// 0o755: owner can read/write/enter, everyone else can read/enter.
-	dirPerm os.FileMode = 0o755
-	// 0o644: owner can read/write, everyone else can read.
-	filePerm os.FileMode = 0o644
-)
-
-func prepareSitesDir(dir string) {
-	if err := os.MkdirAll(dir, dirPerm); err != nil {
-		log.Fatal(err)
-	}
-	// <SitesDir>/.upload-*/ hold sites currently being extracted
-	// They might not get deleted normally if the process is killed or crashes
-	for _, pat := range []string{".upload-*", ".old-*"} {
-		matches, _ := filepath.Glob(filepath.Join(dir, pat))
-		for _, m := range matches {
-			os.RemoveAll(m)
-		}
-	}
 }

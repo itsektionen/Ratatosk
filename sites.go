@@ -2,26 +2,18 @@ package main
 
 import (
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-// Returns the request host, lowercased and without port
-func hostname(r *http.Request) string {
-	host := r.Host
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	// Fun fact: as far as DNS cares, example.com == example.com.
-	return strings.ToLower(strings.TrimSuffix(host, "."))
-}
+var dnsRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 func sitesHandler(cfg Config) http.Handler {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +49,7 @@ func serveSite(w http.ResponseWriter, r *http.Request, root *os.Root) {
 	if name == "" {
 		name = "."
 	}
-	// Prevent the 404 page and directory listing from Go's file server 
+	// Prevent the 404 page and directory listing from Go's file server
 	fi, err := root.Stat(name)
 	if err == nil && fi.IsDir() {
 		fi, err = root.Stat(path.Join(name, "index.html"))

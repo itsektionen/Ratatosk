@@ -34,7 +34,7 @@ type Config struct {
 	MaxFiles    int64 // max number of entries in an uploaded archive
 }
 
-// Defaults are for local dev. 
+// Defaults are for local dev.
 // Docker image and compose should override to be correct for prod
 func LoadConfig() Config {
 	return Config{

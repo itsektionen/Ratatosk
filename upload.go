@@ -5,39 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/itsektionen/ratatosk/web"
 )
-
-func appHandler(cfg Config) http.Handler {
-	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer)
-
-	r.Route("/api", func(api chi.Router) {
-		api.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, "ok")
-		})
-		api.Post("/upload", uploadHandler(cfg))
-	})
-
-	r.Handle("/*", web.Handler())
-
-	return r
-}
-
-var dnsRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-
-func siteURL(r *http.Request, subdomain string) string {
-	scheme := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-		scheme = "https"
-	}
-	return scheme + "://" + subdomain + "." + r.Host + "/"
-}
 
 func uploadHandler(cfg Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -77,4 +46,12 @@ func uploadHandler(cfg Config) http.HandlerFunc {
 
 		fmt.Fprintln(w, siteURL(r, subdomain))
 	}
+}
+
+func siteURL(r *http.Request, subdomain string) string {
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return scheme + "://" + subdomain + "." + r.Host + "/"
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -13,6 +14,27 @@ import (
 
 	extract "github.com/hashicorp/go-extract"
 )
+
+const (
+	// 0o755: owner can read/write/enter, everyone else can read/enter.
+	dirPerm os.FileMode = 0o755
+	// 0o644: owner can read/write, everyone else can read.
+	filePerm os.FileMode = 0o644
+)
+
+func prepareSitesDir(dir string) {
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
+		log.Fatal(err)
+	}
+	// <SitesDir>/.upload-*/ holds sites currently being extracted
+	// They might not get deleted normally if the process is killed or crashes
+	for _, pat := range []string{".upload-*", ".old-*"} {
+		matches, _ := filepath.Glob(filepath.Join(dir, pat))
+		for _, m := range matches {
+			os.RemoveAll(m)
+		}
+	}
+}
 
 // UserError is a problem caused by the uploaded content. 4xx not 500
 type UserError struct{ Msg string }
@@ -139,15 +161,15 @@ func hasIndex(dir string) bool {
 	return err == nil && !fi.IsDir()
 }
 
-// swap replaces live with next, parking the old version at prev to be restored 
-// on failiure. Note: Not atomic. Live will be gone for a moment while it swaps
+// swap replaces live with next, parking the old version at prev to be restored
+// on failure. Note: Not atomic. Live will be gone for a moment while it swaps
 func swap(live, next, prev string) error {
 	hadOld := true
 	if err := os.Rename(live, prev); err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		hadOld = false // FIrst deploy
+		hadOld = false // First deploy
 	}
 	if err := os.Rename(next, live); err != nil {
 		if hadOld {
