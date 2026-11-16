@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	extract "github.com/hashicorp/go-extract"
 	"github.com/itsektionen/ratatosk/internal/config"
@@ -28,12 +29,28 @@ func PrepareDir(dir string) {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		log.Fatal(err)
 	}
-	// <SitesDir>/.upload-*/ holds sites currently being extracted
-	// They might not get deleted normally if the process is killed or crashes
-	for _, pat := range []string{".upload-*", ".old-*"} {
-		matches, _ := filepath.Glob(filepath.Join(dir, pat))
-		for _, m := range matches {
-			os.RemoveAll(m)
+	// <SitesDir>/.upload-*/ holds a site upload currently being extracted.
+	// If it exists, the program crashed and it can't be assumed complete.
+	matches, _ := filepath.Glob(filepath.Join(dir, ".upload-*"))
+	for _, m := range matches {
+		os.RemoveAll(m)
+	}
+	// <SitesDir>/.old-*/ is the site backup made during a swap.
+	// upload -> live move is atomic so live must be good if it exists.
+	olds, _ := filepath.Glob(filepath.Join(dir, ".old-*"))
+	for _, old := range olds {
+		name := strings.TrimPrefix(filepath.Base(old), ".old-")
+		live := filepath.Join(dir, name)
+		_, err := os.Stat(live)
+		switch {
+		case errors.Is(err, fs.ErrNotExist) && ValidName(name):
+			if err := os.Rename(old, live); err != nil {
+				log.Printf("restore %q: %v", name, err)
+			}
+		case err == nil:
+			os.RemoveAll(old)
+		case !errors.Is(err, fs.ErrNotExist):
+			log.Printf("stat %q: %v", live, err)
 		}
 	}
 }
@@ -55,39 +72,58 @@ func userErrorf(format string, a ...any) error {
 	return &UserError{Msg: fmt.Sprintf(format, a...)}
 }
 
-func Deploy(cfg config.Config, subdomain string, file multipart.File, header *multipart.FileHeader) error {
-	tmp, err := os.MkdirTemp(cfg.SitesDir, ".upload-*")
+var swapLocks sync.Map // site name -> *sync.Mutex
+
+func Deploy(cfg config.Config, name string, file multipart.File, header *multipart.FileHeader) error {
+	// <SitesDir>/.upload-XXXX/ per upload
+	workDir, err := os.MkdirTemp(cfg.SitesDir, ".upload-*")
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("sites directory %q was removed while running: %w", cfg.SitesDir, err)
 		}
 		return err
 	}
-	defer os.RemoveAll(tmp)
+	defer os.RemoveAll(workDir)
 
-	staging := filepath.Join(tmp, "new")
-	if err := os.Mkdir(staging, dirPerm); err != nil {
+	// <SitesDir>/.upload-XXXX/new/ to use our perms instead of MkdirTemp defaults
+	extractDir := filepath.Join(workDir, "new")
+	if err := os.Mkdir(extractDir, dirPerm); err != nil {
 		return err
 	}
 
 	switch strings.ToLower(filepath.Ext(header.Filename)) {
 	case ".html", ".htm":
-		err = saveIndex(cfg, filepath.Join(staging, "index.html"), file)
+		err = saveIndex(cfg, filepath.Join(extractDir, "index.html"), file)
 	default:
-		err = unpack(cfg, staging, file)
+		err = unpack(cfg, extractDir, file)
 	}
 	if err != nil {
 		return err
 	}
 
-	if err := checkTree(staging); err != nil {
+	if err := checkTree(extractDir); err != nil {
 		return err
 	}
-	siteDir, err := findIndexDir(staging)
+	// Extracted folder holding index.html (site root). All parents will be discarded
+	newDir, err := findIndexDir(extractDir)
 	if err != nil {
 		return err
 	}
-	return swap(filepath.Join(cfg.SitesDir, subdomain), siteDir, filepath.Join(tmp, "old"))
+
+	// Swaps, swaps, one at a time!
+	mu, _ := swapLocks.LoadOrStore(name, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	defer mu.(*sync.Mutex).Unlock()
+
+	liveDir := filepath.Join(cfg.SitesDir, name)
+	// Parked outside workDir, so it survives the cleanup of workDir if we crash mid-swap
+	backupDir := filepath.Join(cfg.SitesDir, ".old-"+name)
+	if err := swap(liveDir, newDir, backupDir); err != nil {
+		return err
+	}
+	// New version is live
+	os.RemoveAll(backupDir)
+	return nil
 }
 
 func saveIndex(cfg config.Config, dst string, src io.Reader) error {
@@ -171,19 +207,22 @@ func hasIndex(dir string) bool {
 	return err == nil && !fi.IsDir()
 }
 
-// swap replaces live with next, parking the old version at prev to be restored
-// on failure. Note: Not atomic. Live will be gone for a moment while it swaps
-func swap(live, next, prev string) error {
-	hadOld := true
-	if err := os.Rename(live, prev); err != nil {
+// Replaces the directories at current with mext, moving the old one to prev.
+// current -> prev (if exists)
+// next -> current
+// Note: not atomic. There is a moment where current is gone. 
+// On failiure, prev is moved back.
+func swap(current, next, prev string) error {
+	hadCurrent := true
+	if err := os.Rename(current, prev); err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		hadOld = false // First deploy
+		hadCurrent = false
 	}
-	if err := os.Rename(next, live); err != nil {
-		if hadOld {
-			err = errors.Join(err, os.Rename(prev, live))
+	if err := os.Rename(next, current); err != nil {
+		if hadCurrent {
+			err = errors.Join(err, os.Rename(prev, current))
 		}
 		return err
 	}
