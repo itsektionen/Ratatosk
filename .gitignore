@@ -5,6 +5,7 @@ result
 # Local dev
 .env
 .sites
+.data
 
 # Go build output
 /ratatosk

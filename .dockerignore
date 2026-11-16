@@ -7,3 +7,4 @@ result
 flake.*
 .env*
 .sites
+.data

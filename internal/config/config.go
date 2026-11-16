@@ -29,6 +29,7 @@ func envInt64(key string, def int64) int64 {
 type Config struct {
 	Addr        string
 	SitesDir    string
+	DataDir     string // holds the SQLite database
 	BaseDomain  string
 	MaxUpload   int64 // bytes; max request size
 	MaxUnzipped int64 // bytes; total after decompression (zip-bomb guard)
@@ -41,6 +42,7 @@ func Load() Config {
 	return Config{
 		Addr:        env("ADDR", "127.0.0.1:8000"),
 		SitesDir:    env("SITES_DIR", ".sites"),
+		DataDir:     env("DATA_DIR", ".data"),
 		BaseDomain:  env("BASE_DOMAIN", "localhost"),
 		MaxUpload:   envInt64("MAX_UPLOAD", 50<<20),    // 50 MB request
 		MaxUnzipped: envInt64("MAX_UNZIPPED", 200<<20), // 200 MB total after decompression
