@@ -6,15 +6,18 @@ processes:
     environment:
       - ADDR=127.0.0.1:8000 # keep in sync with web/vite.config.ts
       - SITES_DIR=.sites
+      - DATA_DIR=.data
       # Browsers resolve *.localhost, so we can test like this without DNS setup
       - BASE_DOMAIN=localhost
+      - PUBLIC_URL=http://localhost:5173
+      - DEV_LOGIN=1
     # Restart on Go changes
     watch:
       debounce: 500ms
       paths:
         - path: .
           include: ["*.go", go.mod, go.sum]
-          exclude: [web, .sites]
+          exclude: [web, .sites, .data]
   web:
     command: npm run dev
     working_dir: ./web

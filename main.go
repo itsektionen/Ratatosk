@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/itsektionen/ratatosk/internal/app"
+	"github.com/itsektionen/ratatosk/internal/auth"
 	"github.com/itsektionen/ratatosk/internal/config"
+	"github.com/itsektionen/ratatosk/internal/db"
 	"github.com/itsektionen/ratatosk/internal/server"
 	"github.com/itsektionen/ratatosk/internal/sites"
 )
@@ -22,11 +26,9 @@ func main() {
 	var handler http.Handler
 	switch cmd {
 	case "serve":
-		sites.PrepareDir(cfg.SitesDir)
-		handler = server.Root(cfg, app.Handler(cfg), server.Sites(cfg))
+		handler = server.Root(cfg, newApp(cfg), server.Sites(cfg))
 	case "serve-app":
-		sites.PrepareDir(cfg.SitesDir)
-		handler = app.Handler(cfg)
+		handler = newApp(cfg)
 	case "serve-sites":
 		handler = server.Sites(cfg)
 	default:
@@ -39,4 +41,22 @@ func main() {
 		slog.Error("server stopped", "err", err)
 		os.Exit(1)
 	}
+}
+
+// Open DB and prepare site dir (app only)
+func newApp(cfg config.Config) http.Handler {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	database, err := db.Open(ctx, cfg.DataDir)
+	if err != nil {
+		slog.Error("open database", "err", err)
+		os.Exit(1)
+	}
+	sites.PrepareDir(cfg.SitesDir)
+	a, err := auth.New(ctx, cfg, database)
+	if err != nil {
+		slog.Error("set up auth", "err", err)
+		os.Exit(1)
+	}
+	return app.Handler(cfg, a)
 }

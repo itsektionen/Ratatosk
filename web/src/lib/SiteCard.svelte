@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from "#lib/Button.svelte";
 	import { getEditor } from "#lib/editor.svelte.ts";
 	import UpdateIcon from "~icons/ph/pencil-simple-fill";
 	import DeleteIcon from "~icons/ph/trash-fill";
@@ -19,56 +20,72 @@
 
 	const editor = getEditor();
 
+	// Pages render at this size and get scaled down to fit
+	const PREVIEW_W = 512;
+	const PREVIEW_H = (PREVIEW_W * 9) / 16;
+
+	let previewWidth = $state(PREVIEW_W);
 	let loaded = $state(false);
 	let active = $derived(editor.isActive(subdomain));
 </script>
 
-<div class={["flex flex-col border", active ? "border-primary" : "border-border"]}>
-	<div class="aspect-video min-w-0 dash-shade-2">
+<div
+	class={[
+		"group relative flex flex-col border hover:border-primary",
+		active ? "border-primary" : "border-border",
+	]}
+>
+	<div
+		class={[
+			"flex items-center gap-2 border-b p-1.5 group-hover:border-primary",
+			active ? "border-primary" : "border-border",
+		]}
+	>
+		<a
+			href={url}
+			target="_blank"
+			rel="noreferrer"
+			class="flex min-w-0 flex-1 items-baseline gap-2 px-1 text-foreground no-underline after:absolute after:inset-0"
+		>
+			<span class="truncate text-sm leading-6 font-medium">{subdomain}</span>
+			<span class="truncate text-xs text-muted-foreground">by {author}</span>
+		</a>
+		{#if onupdate}
+			<Button
+				onclick={onupdate}
+				title="Update"
+				aria-label="Update"
+				class="relative z-10 size-6 text-sm"
+			>
+				<UpdateIcon />
+			</Button>
+		{/if}
+		{#if ondelete}
+			<Button
+				onclick={ondelete}
+				title="Delete"
+				aria-label="Delete"
+				variant="danger"
+				class="relative z-10 size-6 text-sm"
+			>
+				<DeleteIcon />
+			</Button>
+		{/if}
+	</div>
+	<div class="aspect-video min-w-0 overflow-hidden dash-shade-2" bind:clientWidth={previewWidth}>
 		<iframe
 			src={url}
 			title="Preview of {subdomain}"
 			loading="lazy"
 			sandbox=""
+			width={PREVIEW_W}
+			height={PREVIEW_H}
+			style:transform="scale({previewWidth / PREVIEW_W})"
 			onload={() => (loaded = true)}
 			class={[
-				"size-full border-0 bg-white transition-opacity duration-300",
+				"pointer-events-none origin-top-left border-0 bg-white transition-opacity duration-300",
 				loaded ? "opacity-100" : "opacity-0",
 			]}
 		></iframe>
-	</div>
-	<hr class={active ? "border-primary" : "border-border"} />
-	<div class="flex items-center justify-between gap-2 p-2">
-		<div class="min-w-0">
-			<a href={url} target="_blank" rel="noreferrer" class="block truncate font-medium">
-				{subdomain}
-			</a>
-			<div class="truncate text-sm text-muted-foreground">by {author}</div>
-		</div>
-		{#if onupdate || ondelete}
-			<div class="flex shrink-0 gap-2">
-				{#if onupdate}
-					<button
-						onclick={onupdate}
-						title="Update"
-						class="grid size-8 place-items-center border border-edge hover:border-primary"
-					>
-						<UpdateIcon />
-					</button>
-				{/if}
-				{#if ondelete}
-					<button
-						onclick={ondelete}
-						title="Delete"
-						class={[
-							"grid size-8 place-items-center border",
-							"border-destructive text-destructive hover:bg-destructive/10",
-						]}
-					>
-						<DeleteIcon />
-					</button>
-				{/if}
-			</div>
-		{/if}
 	</div>
 </div>
