@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -41,7 +41,7 @@ func Run(addr string, h http.Handler) error {
 	case err := <-serverErr:
 		return err // the server died by itself
 	case <-ctx.Done():
-		log.Println("stop signal received, shutting down")
+		slog.Info("stop signal received, shutting down")
 	}
 
 	// Ongoing requests have 15 seconds to finish

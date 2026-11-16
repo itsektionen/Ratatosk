@@ -3,7 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -41,7 +41,7 @@ func uploadHandler(cfg config.Config) http.HandlerFunc {
 			if ue, ok := errors.AsType[*sites.UserError](err); ok {
 				http.Error(w, ue.Msg, http.StatusUnprocessableEntity)
 			} else {
-				log.Printf("deploy %q failed: %v", subdomain, err)
+				slog.Error("deploy failed", "site", subdomain, "err", err)
 				http.Error(w, "internal error", http.StatusInternalServerError)
 			}
 			return

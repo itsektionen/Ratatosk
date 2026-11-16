@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -27,7 +27,8 @@ const (
 
 func PrepareDir(dir string) {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
-		log.Fatal(err)
+		slog.Error("create sites dir", "dir", dir, "err", err)
+		os.Exit(1)
 	}
 	// <SitesDir>/.upload-*/ holds a site upload currently being extracted.
 	// If it exists, the program crashed and it can't be assumed complete.
@@ -45,12 +46,12 @@ func PrepareDir(dir string) {
 		switch {
 		case errors.Is(err, fs.ErrNotExist) && ValidName(name):
 			if err := os.Rename(old, live); err != nil {
-				log.Printf("restore %q: %v", name, err)
+				slog.Error("restore site", "name", name, "err", err)
 			}
 		case err == nil:
 			os.RemoveAll(old)
 		case !errors.Is(err, fs.ErrNotExist):
-			log.Printf("stat %q: %v", live, err)
+			slog.Error("stat site", "path", live, "err", err)
 		}
 	}
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -30,11 +30,13 @@ func main() {
 	case "serve-sites":
 		handler = server.Sites(cfg)
 	default:
-		log.Fatalf("unknown command %q (valid: serve, serve-app, serve-sites)", cmd)
+		slog.Error("unknown command", "cmd", cmd, "valid", "serve, serve-app, serve-sites")
+		os.Exit(1)
 	}
 
-	log.Printf("%s listening on %s", cmd, cfg.Addr)
+	slog.Info("listening", "cmd", cmd, "addr", cfg.Addr)
 	if err := server.Run(cfg.Addr, handler); err != nil {
-		log.Fatal(err)
+		slog.Error("server stopped", "err", err)
+		os.Exit(1)
 	}
 }

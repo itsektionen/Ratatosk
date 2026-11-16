@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 )
@@ -20,7 +20,8 @@ func envInt64(key string, def int64) int64 {
 	}
 	n, err := strconv.ParseInt(v, 10, 64)
 	if err != nil {
-		log.Fatalf("invalid %s=%q: must be an integer number of bytes", key, v)
+		slog.Error("invalid env var, must be an integer number of bytes", "key", key, "value", v)
+		os.Exit(1)
 	}
 	return n
 }
