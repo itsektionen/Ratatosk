@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/itsektionen/ratatosk/internal/auth"
@@ -51,33 +52,75 @@ func listSites(store *sites.Store) http.HandlerFunc {
 	}
 }
 
+// editableSite gets the site named in the URL if the user may modify it.
+// Otherwise it writes the error response and returns false
+func editableSite(w http.ResponseWriter, r *http.Request, store *sites.Store) (sites.Site, bool) {
+	name := chi.URLParam(r, "name")
+	if !sites.ValidName(name) {
+		http.NotFound(w, r)
+		return sites.Site{}, false
+	}
+	site, err := store.Get(r.Context(), name)
+	if errors.Is(err, sites.ErrNotFound) {
+		http.NotFound(w, r)
+		return sites.Site{}, false
+	}
+	if err != nil {
+		slog.Error("get site", "site", name, "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return sites.Site{}, false
+	}
+	user, _ := auth.FromContext(r.Context())
+	if !user.CanEdit(site.OwnedBy(user.ID)) {
+		http.Error(w, "you can't modify this site", http.StatusForbidden)
+		return sites.Site{}, false
+	}
+	return site, true
+}
+
 func deleteSite(store *sites.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		name := chi.URLParam(r, "name")
-		if !sites.ValidName(name) {
-			http.NotFound(w, r)
+		site, ok := editableSite(w, r, store)
+		if !ok {
 			return
 		}
-		site, err := store.Get(r.Context(), name)
-		if errors.Is(err, sites.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		if err != nil {
-			slog.Error("get site", "site", name, "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		user, _ := auth.FromContext(r.Context())
-		if !user.CanEdit(site.OwnedBy(user.ID)) {
-			http.Error(w, "you can't modify this site", http.StatusForbidden)
-			return
-		}
-		if err := store.Delete(r.Context(), name); err != nil {
-			slog.Error("delete site", "site", name, "err", err)
+		if err := store.Delete(r.Context(), site.Name); err != nil {
+			slog.Error("delete site", "site", site.Name, "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func renameSite(store *sites.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&body); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		to := strings.ToLower(strings.TrimSpace(body.Name))
+		if !sites.ValidName(to) {
+			http.Error(w, "invalid subdomain", http.StatusBadRequest)
+			return
+		}
+		site, ok := editableSite(w, r, store)
+		if !ok {
+			return
+		}
+		switch err := store.Rename(r.Context(), site.Name, to); {
+		case errors.Is(err, sites.ErrTaken):
+			http.Error(w, "that subdomain is taken", http.StatusConflict)
+		case errors.Is(err, sites.ErrNotFound):
+			http.NotFound(w, r) // deleted in the meantime
+		case err != nil:
+			slog.Error("rename site", "site", site.Name, "to", to, "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusNoContent)
+		}
 	}
 }

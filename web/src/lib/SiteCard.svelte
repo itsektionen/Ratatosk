@@ -1,7 +1,8 @@
 <script lang="ts">
 	import Button from "#lib/Button.svelte";
 	import { getEditor } from "#lib/editor.svelte.ts";
-	import UpdateIcon from "~icons/ph/pencil-simple-fill";
+	import UpdateIcon from "~icons/ph/upload-simple-fill";
+	import RenameIcon from "~icons/ph/textbox-fill";
 	import DeleteIcon from "~icons/ph/trash-fill";
 
 	let {
@@ -9,12 +10,14 @@
 		url,
 		author,
 		onupdate,
+		onrename,
 		ondelete,
 	}: {
 		subdomain: string;
 		url: string;
 		author?: string;
 		onupdate?: () => void;
+		onrename?: () => void;
 		ondelete?: () => void;
 	} = $props();
 
@@ -60,6 +63,16 @@
 				class="relative z-10 size-6 text-sm"
 			>
 				<UpdateIcon />
+			</Button>
+		{/if}
+		{#if onrename}
+			<Button
+				onclick={onrename}
+				title="Rename"
+				aria-label="Rename"
+				class="relative z-10 size-6 text-sm"
+			>
+				<RenameIcon />
 			</Button>
 		{/if}
 		{#if ondelete}

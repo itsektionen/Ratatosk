@@ -27,6 +27,7 @@ func Handler(cfg config.Config, a *auth.Auth, store *sites.Store) http.Handler {
 		api.With(auth.RequireUser).Group(func(r chi.Router) {
 			r.Post("/upload", uploadHandler(cfg, store))
 			r.Delete("/sites/{name}", deleteSite(store))
+			r.Patch("/sites/{name}", renameSite(store))
 		})
 	})
 

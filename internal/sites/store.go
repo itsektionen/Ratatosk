@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -90,6 +91,41 @@ func (s *Store) List(ctx context.Context) ([]Site, error) {
 		out[i] = Site(row)
 	}
 	return out, nil
+}
+
+var ErrTaken = errors.New("site name taken")
+
+// Rename moves a site's row, then its files, to a new name. A crash in between
+// leaves the files under the old name, to be adopted as unowned on startup
+func (s *Store) Rename(ctx context.Context, from, to string) error {
+	if from == to {
+		return nil
+	}
+	defer lock(from, to)()
+	// Files without a row (added by hand while running) still hold the name
+	if _, err := os.Lstat(filepath.Join(s.dir, to)); err == nil {
+		return ErrTaken
+	}
+	n, err := s.q.RenameSite(ctx, sitesdb.RenameSiteParams{OldName: from, NewName: to})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		if _, err := s.Get(ctx, from); err != nil {
+			return err
+		}
+		return ErrTaken
+	}
+	err = os.Rename(filepath.Join(s.dir, from), filepath.Join(s.dir, to))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil // claimed but never deployed, so there are no files to move
+	}
+	if err != nil {
+		// Move the row back, so it matches the files again
+		_, rerr := s.q.RenameSite(ctx, sitesdb.RenameSiteParams{OldName: to, NewName: from})
+		return errors.Join(err, rerr)
+	}
+	return nil
 }
 
 // Delete removes the site's row, then its files

@@ -6,6 +6,10 @@ ON CONFLICT (name) DO NOTHING;
 -- name: UnownSite :exec
 UPDATE sites SET owner_id = NULL WHERE name = sqlc.arg(name);
 
+-- Changes no rows if the new name is taken
+-- name: RenameSite :execrows
+UPDATE OR IGNORE sites SET name = sqlc.arg(new_name) WHERE name = sqlc.arg(old_name);
+
 -- name: DeleteSite :exec
 DELETE FROM sites WHERE name = sqlc.arg(name);
 

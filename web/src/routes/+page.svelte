@@ -48,6 +48,17 @@
 		}
 	}
 
+	async function rename(name: string) {
+		const to = prompt(`Rename ${name} to`, name)?.trim().toLowerCase();
+		if (!to || to === name) return;
+		try {
+			await sites.rename(name, to);
+			if (editor.subdomain === name) editor.subdomain = to;
+		} catch (e) {
+			message = fail(e);
+		}
+	}
+
 	async function remove(name: string) {
 		if (!confirm(`Delete ${name}?`)) return;
 		try {
@@ -118,6 +129,7 @@
 				url={site.url}
 				author={authorOf(site)}
 				onupdate={site.canEdit ? () => edit(site.name) : undefined}
+				onrename={site.canEdit ? () => rename(site.name) : undefined}
 				ondelete={site.canEdit ? () => remove(site.name) : undefined}
 			/>
 		{/each}

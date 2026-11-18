@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -75,6 +76,22 @@ func userErrorf(format string, a ...any) error {
 
 var swapLocks sync.Map // site name -> *sync.Mutex
 
+// lock holds the swap locks of names, always in sorted order so two callers can't deadlock
+func lock(names ...string) (unlock func()) {
+	slices.Sort(names)
+	held := make([]*sync.Mutex, len(names))
+	for i, name := range names {
+		mu, _ := swapLocks.LoadOrStore(name, &sync.Mutex{})
+		held[i] = mu.(*sync.Mutex)
+		held[i].Lock()
+	}
+	return func() {
+		for _, mu := range held {
+			mu.Unlock()
+		}
+	}
+}
+
 func Deploy(cfg config.Config, name string, file multipart.File, header *multipart.FileHeader) error {
 	// <SitesDir>/.upload-XXXX/ per upload
 	workDir, err := os.MkdirTemp(cfg.SitesDir, ".upload-*")
@@ -112,9 +129,7 @@ func Deploy(cfg config.Config, name string, file multipart.File, header *multipa
 	}
 
 	// Swaps, swaps, one at a time!
-	mu, _ := swapLocks.LoadOrStore(name, &sync.Mutex{})
-	mu.(*sync.Mutex).Lock()
-	defer mu.(*sync.Mutex).Unlock()
+	defer lock(name)()
 
 	liveDir := filepath.Join(cfg.SitesDir, name)
 	// Parked outside workDir, so it survives the cleanup of workDir if we crash mid-swap

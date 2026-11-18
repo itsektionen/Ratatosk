@@ -13,6 +13,16 @@ export class Sites {
 		this.list = await res.json();
 	}
 
+	async rename(name: string, to: string) {
+		const res = await fetch(`/api/sites/${encodeURIComponent(name)}`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ name: to }),
+		});
+		if (!res.ok) throw new Error(await res.text());
+		await this.refresh(); // the URL changed too
+	}
+
 	async remove(name: string) {
 		const res = await fetch(`/api/sites/${encodeURIComponent(name)}`, { method: "DELETE" });
 		if (!res.ok) throw new Error(await res.text());

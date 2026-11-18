@@ -126,6 +126,24 @@ func (q *Queries) ListSites(ctx context.Context) ([]ListSitesRow, error) {
 	return items, nil
 }
 
+const renameSite = `-- name: RenameSite :execrows
+UPDATE OR IGNORE sites SET name = ?1 WHERE name = ?2
+`
+
+type RenameSiteParams struct {
+	NewName string
+	OldName string
+}
+
+// Changes no rows if the new name is taken
+func (q *Queries) RenameSite(ctx context.Context, arg RenameSiteParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, renameSite, arg.NewName, arg.OldName)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const unownSite = `-- name: UnownSite :exec
 UPDATE sites SET owner_id = NULL WHERE name = ?1
 `
