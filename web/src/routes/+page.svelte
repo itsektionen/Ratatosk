@@ -1,6 +1,6 @@
 <script lang="ts">
 	import AccountPanel from "#lib/AccountPanel.svelte";
-	import { api, errorText } from "#lib/api.ts";
+	import { errorText } from "#lib/api.ts";
 	import { getAuth } from "#lib/auth.svelte.ts";
 	import { authorOf } from "#lib/boot.ts";
 	import Button from "#lib/Button.svelte";
@@ -35,8 +35,7 @@
 		uploading = true;
 		message = null;
 		try {
-			await api("/api/upload", { method: "POST", body: new FormData(e.currentTarget) });
-			await sites.refresh();
+			await sites.upload(new FormData(e.currentTarget));
 			message = { error: false, text: "Uploaded" };
 		} catch (e) {
 			message = fail(e);
@@ -124,6 +123,7 @@
 			<SiteCard
 				subdomain={site.name}
 				url={site.url}
+				revision={sites.revisions[site.name] ?? 0}
 				author={authorOf(site)}
 				onupdate={site.canEdit ? () => edit(site.name) : undefined}
 				onrename={site.canEdit ? () => rename(site.name) : undefined}

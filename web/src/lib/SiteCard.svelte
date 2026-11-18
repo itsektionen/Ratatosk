@@ -8,6 +8,7 @@
 	let {
 		subdomain,
 		url,
+		revision = 0,
 		author,
 		onupdate,
 		onrename,
@@ -15,6 +16,8 @@
 	}: {
 		subdomain: string;
 		url: string;
+		/** Changes when the site's files are replaced, to reload the preview */
+		revision?: number;
 		author?: string;
 		onupdate?: () => void;
 		onrename?: () => void;
@@ -88,21 +91,23 @@
 		{/if}
 	</div>
 	<div class="aspect-video min-w-0 overflow-hidden dash-shade-2" bind:clientWidth={previewWidth}>
-		<iframe
-			src={url}
-			title="Preview of {subdomain}"
-			loading="lazy"
-			// No allow-same-origin, so a site can't touch our cookies. The server allows it to fetch its own files
-			sandbox="allow-scripts"
-			width={PREVIEW_W}
-			height={PREVIEW_H}
-			style:transform="scale({previewWidth / PREVIEW_W})"
-			onload={() => (loaded = true)}
-			class={[
-				// Canvas is the browser's default page background, so sites without one look like they do on their own
-				"pointer-events-none origin-top-left border-0 bg-[Canvas] transition-opacity duration-300",
-				loaded ? "opacity-100" : "opacity-0",
-			]}
-		></iframe>
+		{#key revision}
+			<iframe
+				src={url}
+				title="Preview of {subdomain}"
+				loading="lazy"
+				// No allow-same-origin, so a site can't touch our cookies. The server allows it to fetch its own files
+				sandbox="allow-scripts"
+				width={PREVIEW_W}
+				height={PREVIEW_H}
+				style:transform="scale({previewWidth / PREVIEW_W})"
+				onload={() => (loaded = true)}
+				class={[
+					// Canvas is the browser's default page background, so sites without one look like they do on their own
+					"pointer-events-none origin-top-left border-0 bg-[Canvas] transition-opacity duration-300",
+					loaded ? "opacity-100" : "opacity-0",
+				]}
+			></iframe>
+		{/key}
 	</div>
 </div>

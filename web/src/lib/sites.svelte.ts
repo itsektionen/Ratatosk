@@ -6,9 +6,19 @@ export class Sites {
 	list = $state<Site[]>([]);
 	/** Sites live at `<name>.<baseDomain>` */
 	baseDomain = $state("");
+	/** Bumped when a site's files are replaced, so its preview reloads */
+	revisions = $state<Record<string, number>>({});
 
 	async refresh() {
 		this.list = await (await api("/api/sites")).json();
+	}
+
+	async upload(form: FormData) {
+		await api("/api/upload", { method: "POST", body: form });
+		// Same normalization as the server
+		const name = String(form.get("subdomain")).trim().toLowerCase();
+		this.revisions[name] = (this.revisions[name] ?? 0) + 1;
+		await this.refresh();
 	}
 
 	async rename(name: string, to: string) {
