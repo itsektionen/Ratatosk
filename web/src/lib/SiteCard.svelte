@@ -86,7 +86,8 @@
 			style:transform="scale({previewWidth / PREVIEW_W})"
 			onload={() => (loaded = true)}
 			class={[
-				"pointer-events-none origin-top-left border-0 bg-white transition-opacity duration-300",
+				// Canvas is the browser's default page background, so sites without one look like they do on their own
+				"pointer-events-none origin-top-left border-0 bg-[Canvas] transition-opacity duration-300",
 				loaded ? "opacity-100" : "opacity-0",
 			]}
 		></iframe>
