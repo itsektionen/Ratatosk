@@ -81,6 +81,15 @@ func (s *Store) Get(ctx context.Context, name string) (Site, error) {
 	return Site(row), err
 }
 
+// Random returns the name of a random site, or ErrNotFound if there are none
+func (s *Store) Random(ctx context.Context) (string, error) {
+	name, err := s.q.RandomSite(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return name, err
+}
+
 func (s *Store) List(ctx context.Context) ([]Site, error) {
 	rows, err := s.q.ListSites(ctx)
 	if err != nil {

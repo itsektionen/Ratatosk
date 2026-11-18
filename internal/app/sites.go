@@ -52,6 +52,23 @@ func listSites(store *sites.Store) http.HandlerFunc {
 	}
 }
 
+func randomSite(store *sites.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		name, err := store.Random(r.Context())
+		if errors.Is(err, sites.ErrNotFound) {
+			http.Error(w, "there are no sites yet", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			slog.Error("random site", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, siteURL(r, name), http.StatusFound)
+	}
+}
+
 // editableSite gets the site named in the URL if the user may modify it.
 // Otherwise it writes the error response and returns false
 func editableSite(w http.ResponseWriter, r *http.Request, store *sites.Store) (sites.Site, bool) {

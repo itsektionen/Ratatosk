@@ -25,6 +25,9 @@ SELECT s.name,
 FROM sites s LEFT JOIN users u ON u.id = s.owner_id
 WHERE s.name = sqlc.arg(name);
 
+-- name: RandomSite :one
+SELECT name FROM sites ORDER BY random() LIMIT 1;
+
 -- name: ListSites :many
 SELECT s.name,
        CAST(COALESCE(s.owner_id, 0) AS INTEGER) AS owner_id,

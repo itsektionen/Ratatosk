@@ -126,6 +126,17 @@ func (q *Queries) ListSites(ctx context.Context) ([]ListSitesRow, error) {
 	return items, nil
 }
 
+const randomSite = `-- name: RandomSite :one
+SELECT name FROM sites ORDER BY random() LIMIT 1
+`
+
+func (q *Queries) RandomSite(ctx context.Context) (string, error) {
+	row := q.db.QueryRowContext(ctx, randomSite)
+	var name string
+	err := row.Scan(&name)
+	return name, err
+}
+
 const renameSite = `-- name: RenameSite :execrows
 UPDATE OR IGNORE sites SET name = ?1 WHERE name = ?2
 `

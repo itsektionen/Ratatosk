@@ -31,6 +31,7 @@ func Handler(cfg config.Config, a *auth.Auth, store *sites.Store) http.Handler {
 		})
 	})
 
+	r.Get("/random", randomSite(store))
 	r.With(a.Middleware).Handle("/*", web.Handler(bootJSON(cfg, a, store)))
 
 	return r
