@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"cmp"
 	"context"
 	"crypto/subtle"
+	"errors"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -10,6 +13,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/itsektionen/ratatosk/internal/config"
+	"github.com/itsektionen/ratatosk/internal/httpx"
 	"golang.org/x/oauth2"
 )
 
@@ -19,16 +23,6 @@ type oidcClient struct {
 	oauth       oauth2.Config
 	verifier    *oidc.IDTokenVerifier
 	adminGroups []string
-}
-
-// roleFor makes admins of the members of an admin group, everyone else a member
-func (c *oidcClient) roleFor(groups []string) Role {
-	for _, g := range groups {
-		if slices.Contains(c.adminGroups, g) {
-			return RoleAdmin
-		}
-	}
-	return RoleMember
 }
 
 func newOIDC(ctx context.Context, cfg config.Config) (*oidcClient, error) {
@@ -52,64 +46,34 @@ func newOIDC(ctx context.Context, cfg config.Config) (*oidcClient, error) {
 	}, nil
 }
 
-// login sends the browser to the identity provider. The state, nonce and PKCE
-// verifier are kept in a short-lived cookie until the provider sends it back
-func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
-	if a.oidc == nil {
-		http.Error(w, "login is not configured", http.StatusNotFound)
-		return
+func (c *oidcClient) roleFor(groups []string) Role {
+	for _, g := range groups {
+		if slices.Contains(c.adminGroups, g) {
+			return RoleAdmin
+		}
 	}
-	state, nonce, verifier := oauth2.GenerateVerifier(), oauth2.GenerateVerifier(), oauth2.GenerateVerifier()
-	http.SetCookie(w, &http.Cookie{
-		Name:     a.cookieName(oidcCookie),
-		Value:    state + "." + nonce + "." + verifier,
-		Path:     "/", // __Host- needs it
-		MaxAge:   int((10 * time.Minute).Seconds()),
-		HttpOnly: true,
-		Secure:   a.secure(),
-		SameSite: http.SameSiteLaxMode,
-	})
-	url := a.oidc.oauth.AuthCodeURL(state,
-		oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier))
-	http.Redirect(w, r, url, http.StatusFound)
+	return RoleMember
 }
 
-func (a *Auth) callback(w http.ResponseWriter, r *http.Request) {
-	if a.oidc == nil {
-		http.Error(w, "login is not configured", http.StatusNotFound)
-		return
-	}
-	c, err := r.Cookie(a.cookieName(oidcCookie))
-	if err != nil {
-		http.Error(w, "login expired, try again", http.StatusBadRequest)
-		return
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     a.cookieName(oidcCookie),
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   a.secure(),
-	})
+type identity struct {
+	sub  string
+	name string
+	role Role
+}
 
-	parts := strings.Split(c.Value, ".")
-	if len(parts) != 3 ||
-		subtle.ConstantTimeCompare([]byte(parts[0]), []byte(r.URL.Query().Get("state"))) != 1 {
-		http.Error(w, "invalid state", http.StatusBadRequest)
-		return
-	}
-	nonce, verifier := parts[1], parts[2]
-
-	tok, err := a.oidc.oauth.Exchange(r.Context(), r.URL.Query().Get("code"), oauth2.VerifierOption(verifier))
+// identify trades the code the provider sent back for who signed in
+func (c *oidcClient) identify(ctx context.Context, code, nonce, verifier string) (identity, error) {
+	tok, err := c.oauth.Exchange(ctx, code, oauth2.VerifierOption(verifier))
 	if err != nil {
-		http.Error(w, "login failed", http.StatusBadGateway)
-		return
+		return identity{}, err
 	}
 	rawID, _ := tok.Extra("id_token").(string)
-	idToken, err := a.oidc.verifier.Verify(r.Context(), rawID)
-	if err != nil || subtle.ConstantTimeCompare([]byte(idToken.Nonce), []byte(nonce)) != 1 {
-		http.Error(w, "login failed", http.StatusBadGateway)
-		return
+	idToken, err := c.verifier.Verify(ctx, rawID)
+	if err != nil {
+		return identity{}, err
+	}
+	if subtle.ConstantTimeCompare([]byte(idToken.Nonce), []byte(nonce)) != 1 {
+		return identity{}, errors.New("nonce mismatch")
 	}
 	var claims struct {
 		Name     string   `json:"name"`
@@ -117,21 +81,49 @@ func (a *Auth) callback(w http.ResponseWriter, r *http.Request) {
 		Groups   []string `json:"groups"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
+		return identity{}, err
+	}
+	return identity{
+		sub:  idToken.Subject,
+		name: cmp.Or(claims.Name, claims.Username, idToken.Subject),
+		role: c.roleFor(claims.Groups),
+	}, nil
+}
+
+// login sends the browser to the identity provider. The state, nonce and PKCE
+// verifier are kept in a short-lived cookie until the provider sends it back
+func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
+	state, nonce, verifier := oauth2.GenerateVerifier(), oauth2.GenerateVerifier(), oauth2.GenerateVerifier()
+	a.setCookie(w, oidcCookie, state+"."+nonce+"."+verifier, 10*time.Minute)
+	url := a.oidc.oauth.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier))
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
+func (a *Auth) callback(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie(a.cookieName(oidcCookie))
+	if err != nil {
+		http.Error(w, "login expired, try again", http.StatusBadRequest)
+		return
+	}
+	a.deleteCookie(w, oidcCookie)
+
+	query := r.URL.Query()
+	parts := strings.Split(c.Value, ".")
+	if len(parts) != 3 || subtle.ConstantTimeCompare([]byte(parts[0]), []byte(query.Get("state"))) != 1 {
+		http.Error(w, "invalid state", http.StatusBadRequest)
+		return
+	}
+	id, err := a.oidc.identify(r.Context(), query.Get("code"), parts[1], parts[2])
+	if err != nil {
+		slog.Warn("oidc login failed", "err", err)
 		http.Error(w, "login failed", http.StatusBadGateway)
 		return
 	}
-	name := claims.Name
-	if name == "" {
-		name = claims.Username
-	}
-	if name == "" {
-		name = idToken.Subject
-	}
 
-	u, err := a.upsertOIDCUser(r.Context(), idToken.Subject, name, a.oidc.roleFor(claims.Groups))
+	u, err := a.upsertOIDCUser(r.Context(), id.sub, id.name, id.role)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		httpx.InternalError(w, "upsert user", err)
 		return
 	}
-	a.startSession(w, r, u)
+	a.signInAndRedirect(w, r, u)
 }

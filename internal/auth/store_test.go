@@ -106,11 +106,7 @@ func TestRedeemShareLinkCreatesNoUser(t *testing.T) {
 	if got.ID != u.ID {
 		t.Errorf("signed in as user %d, want %d", got.ID, u.ID)
 	}
-	var n int
-	if err := database.QueryRow(`SELECT count(*) FROM users`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 1 {
+	if n := userCount(t, database); n != 1 {
 		t.Errorf("users=%d, want 1", n)
 	}
 }

@@ -2,11 +2,11 @@ package app
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/itsektionen/ratatosk/internal/auth"
 	"github.com/itsektionen/ratatosk/internal/config"
+	"github.com/itsektionen/ratatosk/internal/httpx"
 	"github.com/itsektionen/ratatosk/internal/sites"
 )
 
@@ -33,13 +33,11 @@ func bootHandler(cfg config.Config, a *auth.Auth, store *sites.Store) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		b, err := loadBoot(r, cfg, a, store)
 		if err != nil {
-			slog.Error("load boot", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			httpx.InternalError(w, "load boot", err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
-		json.NewEncoder(w).Encode(b)
+		httpx.WriteJSON(w, b)
 	}
 }
 

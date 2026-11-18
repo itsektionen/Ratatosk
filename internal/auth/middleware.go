@@ -21,23 +21,24 @@ func (a *Auth) cookieName(name string) string {
 	return name
 }
 
-func (a *Auth) setSessionCookie(w http.ResponseWriter, token string, expires time.Time) {
+// setCookie sets a cookie that scripts can't read and that lasts for ttl
+func (a *Auth) setCookie(w http.ResponseWriter, name, value string, ttl time.Duration) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     a.cookieName(sessionCookie),
-		Value:    token,
-		Path:     "/",
-		Expires:  expires,
+		Name:     a.cookieName(name),
+		Value:    value,
+		Path:     "/", // __Host- needs it
+		MaxAge:   int(ttl.Seconds()),
 		HttpOnly: true,
 		Secure:   a.secure(),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
-func (a *Auth) clearSessionCookie(w http.ResponseWriter) {
-	a.setSessionCookie(w, "", time.Unix(0, 0))
+func (a *Auth) deleteCookie(w http.ResponseWriter, name string) {
+	a.setCookie(w, name, "", -time.Second)
 }
 
-// Loads the signed-in user, if any, into the request context
+// Middleware loads the signed-in user, if any, into the request context
 func (a *Auth) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if c, err := r.Cookie(a.cookieName(sessionCookie)); err == nil {

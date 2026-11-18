@@ -1,9 +1,12 @@
+import { api } from "#lib/api.ts";
 import { createContext } from "svelte";
+
+export type Role = "admin" | "member" | "guest";
 
 export interface User {
 	id: number;
 	name: string;
-	role: "admin" | "member" | "guest";
+	role: Role;
 }
 
 export interface Link {
@@ -34,12 +37,7 @@ export class Auth {
 
 	/** "invites" is for a new guest, "share" signs another device in as you */
 	async createLink(kind: "invites" | "share", hours?: number): Promise<Link> {
-		const res = await fetch(`/api/auth/${kind}`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(hours ? { hours } : {}),
-		});
-		if (!res.ok) throw new Error(await res.text());
+		const res = await api(`/api/auth/${kind}`, { method: "POST", json: hours ? { hours } : {} });
 		const { url, expires } = await res.json();
 		return { url, expires: new Date(expires) };
 	}

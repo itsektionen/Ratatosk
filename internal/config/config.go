@@ -21,7 +21,7 @@ func envInt64(key string, def int64) int64 {
 	}
 	n, err := strconv.ParseInt(v, 10, 64)
 	if err != nil {
-		slog.Error("invalid env var, must be an integer number of bytes", "key", key, "value", v)
+		slog.Error("invalid env var, must be an integer", "key", key, "value", v)
 		os.Exit(1)
 	}
 	return n
@@ -51,7 +51,7 @@ type Config struct {
 
 	// Storage
 	SitesDir string // uploaded sites
-	DataDir  string // SQLite database
+	DataDir  string // Database
 
 	// Upload limits
 	MaxUpload   int64 // bytes per request
@@ -66,8 +66,8 @@ type Config struct {
 	DevLogin         bool     // passwordless admin login, never in production
 }
 
-// Defaults are for local dev.
-// Docker image and compose should override to be correct for prod
+// Load reads the config from the environment. Defaults are for local dev,
+// the Docker image and compose file override them for production
 func Load() Config {
 	return Config{
 		Addr:       env("ADDR", "127.0.0.1:8000"),
@@ -77,8 +77,8 @@ func Load() Config {
 		SitesDir: env("SITES_DIR", ".sites"),
 		DataDir:  env("DATA_DIR", ".data"),
 
-		MaxUpload:   envInt64("MAX_UPLOAD", 50<<20),    // 50 MB request
-		MaxUnzipped: envInt64("MAX_UNZIPPED", 200<<20), // 200 MB total after decompression
+		MaxUpload:   envInt64("MAX_UPLOAD", 50<<20),
+		MaxUnzipped: envInt64("MAX_UNZIPPED", 200<<20),
 		MaxFiles:    envInt64("MAX_FILES", 10_000),
 
 		OIDCIssuer:       os.Getenv("OIDC_ISSUER"),

@@ -26,6 +26,7 @@ const (
 	filePerm os.FileMode = 0o644
 )
 
+// PrepareDir creates the sites dir and cleans up after a crash mid-deploy
 func PrepareDir(dir string) {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		slog.Error("create sites dir", "dir", dir, "err", err)
@@ -63,7 +64,7 @@ func ValidName(name string) bool {
 	return dnsRe.MatchString(name)
 }
 
-// UserError is a problem caused by the uploaded content. 4xx not 500
+// UserError is a problem with the uploaded content, to be shown to the uploader
 type UserError struct{ Msg string }
 
 func (e *UserError) Error() string {
@@ -200,7 +201,8 @@ func checkTree(root string) error {
 	})
 }
 
-// Archives often wrap everything in a single folder. Unwrap it
+// findIndexDir returns the site root: dir itself, or the single folder that
+// archives often wrap everything in
 func findIndexDir(dir string) (string, error) {
 	if hasIndex(dir) {
 		return dir, nil
@@ -217,17 +219,15 @@ func findIndexDir(dir string) (string, error) {
 	return "", userErrorf("upload has no index.html at its root")
 }
 
-// Does not consider symlinks. Safe only after checkTree
+// hasIndex reports whether dir has an index.html file. It follows symlinks,
+// so it is only safe after checkTree
 func hasIndex(dir string) bool {
 	fi, err := os.Stat(filepath.Join(dir, "index.html"))
 	return err == nil && !fi.IsDir()
 }
 
-// Replaces the directories at current with mext, moving the old one to prev.
-// current -> prev (if exists)
-// next -> current
-// Note: not atomic. There is a moment where current is gone. 
-// On failiure, prev is moved back.
+// swap moves current (if it exists) to prev and next to current. On failure prev
+// is moved back. It is not atomic: current is briefly missing in between
 func swap(current, next, prev string) error {
 	hadCurrent := true
 	if err := os.Rename(current, prev); err != nil {

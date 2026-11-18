@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/itsektionen/ratatosk/internal/auth"
 	"github.com/itsektionen/ratatosk/internal/config"
+	"github.com/itsektionen/ratatosk/internal/httpx"
 	"github.com/itsektionen/ratatosk/internal/sites"
 )
 
@@ -35,8 +35,7 @@ func uploadHandler(cfg config.Config, store *sites.Store) http.HandlerFunc {
 		user, _ := auth.FromContext(r.Context())
 		site, created, err := store.Claim(r.Context(), subdomain, user.ID)
 		if err != nil {
-			slog.Error("claim site", "site", subdomain, "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			httpx.InternalError(w, "claim site", err, "site", subdomain)
 			return
 		}
 		if !created && !user.CanEdit(site.OwnedBy(user.ID)) {
@@ -63,8 +62,7 @@ func uploadHandler(cfg config.Config, store *sites.Store) http.HandlerFunc {
 			if ue, ok := errors.AsType[*sites.UserError](err); ok {
 				http.Error(w, ue.Msg, http.StatusUnprocessableEntity)
 			} else {
-				slog.Error("deploy failed", "site", subdomain, "err", err)
-				http.Error(w, "internal error", http.StatusInternalServerError)
+				httpx.InternalError(w, "deploy failed", err, "site", subdomain)
 			}
 			return
 		}

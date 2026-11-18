@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { api, errorText } from "#lib/api.ts";
 	import Button from "#lib/Button.svelte";
 	import { onMount } from "svelte";
 
@@ -22,15 +23,10 @@
 		busy = true;
 		error = null;
 		try {
-			const res = await fetch("/api/auth/join", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ token, name }),
-			});
-			if (!res.ok) throw new Error((await res.text()).trim());
+			await api("/api/auth/join", { method: "POST", json: { token, name } });
 			location.replace("/"); // reload as the new guest, without the token in the URL
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			error = errorText(e);
 			busy = false;
 		}
 	}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AccountPanel from "#lib/AccountPanel.svelte";
+	import { api, errorText } from "#lib/api.ts";
 	import { getAuth } from "#lib/auth.svelte.ts";
 	import { authorOf } from "#lib/boot.ts";
 	import Button from "#lib/Button.svelte";
@@ -27,18 +28,14 @@
 	let uploading = $state(false);
 	let message = $state<{ error: boolean; text: string } | null>(null);
 
-	const fail = (e: unknown) => ({ error: true, text: e instanceof Error ? e.message : String(e) });
+	const fail = (e: unknown) => ({ error: true, text: errorText(e) });
 
 	async function upload(e: SubmitEvent & { currentTarget: HTMLFormElement }) {
 		e.preventDefault();
 		uploading = true;
 		message = null;
 		try {
-			const res = await fetch("/api/upload", {
-				method: "POST",
-				body: new FormData(e.currentTarget),
-			});
-			if (!res.ok) throw new Error((await res.text()).trim());
+			await api("/api/upload", { method: "POST", body: new FormData(e.currentTarget) });
 			await sites.refresh();
 			message = { error: false, text: "Uploaded" };
 		} catch (e) {

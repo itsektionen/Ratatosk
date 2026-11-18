@@ -43,7 +43,6 @@ func main() {
 	}
 }
 
-// Open DB and prepare site dir (app only)
 func newApp(cfg config.Config) http.Handler {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

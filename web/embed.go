@@ -13,7 +13,7 @@ import (
 //go:embed all:build
 var webFS embed.FS
 
-// Serves the built web app. boot returns JSON that is embedded into every HTML
+// Handler serves the built web app. boot returns JSON that is embedded into every HTML
 // page, so the page starts with its data instead of fetching it
 func Handler(boot func(*http.Request) ([]byte, error)) http.Handler {
 	build, err := fs.Sub(webFS, "build")

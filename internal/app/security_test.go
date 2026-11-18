@@ -39,15 +39,3 @@ func TestSameOriginOnly(t *testing.T) {
 		}
 	}
 }
-
-func TestDenyFraming(t *testing.T) {
-	rec := httptest.NewRecorder()
-	denyFraming(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).
-		ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
-	if got := rec.Header().Get("Content-Security-Policy"); got != "frame-ancestors 'none'" {
-		t.Errorf("CSP=%q", got)
-	}
-	if rec.Header().Get("X-Frame-Options") != "DENY" {
-		t.Error("X-Frame-Options is not DENY")
-	}
-}

@@ -1,14 +1,13 @@
 package app
 
 import (
-	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/itsektionen/ratatosk/internal/auth"
+	"github.com/itsektionen/ratatosk/internal/httpx"
 	"github.com/itsektionen/ratatosk/internal/sites"
 )
 
@@ -43,12 +42,10 @@ func listSites(store *sites.Store) http.HandlerFunc {
 		user, _ := auth.FromContext(r.Context())
 		views, err := siteViews(r, store, user)
 		if err != nil {
-			slog.Error("list sites", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			httpx.InternalError(w, "list sites", err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(views)
+		httpx.WriteJSON(w, views)
 	}
 }
 
@@ -61,8 +58,7 @@ func randomSite(store *sites.Store) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			slog.Error("random site", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			httpx.InternalError(w, "random site", err)
 			return
 		}
 		http.Redirect(w, r, siteURL(r, name), http.StatusFound)
@@ -83,8 +79,7 @@ func editableSite(w http.ResponseWriter, r *http.Request, store *sites.Store) (s
 		return sites.Site{}, false
 	}
 	if err != nil {
-		slog.Error("get site", "site", name, "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		httpx.InternalError(w, "get site", err, "site", name)
 		return sites.Site{}, false
 	}
 	user, _ := auth.FromContext(r.Context())
@@ -102,8 +97,7 @@ func deleteSite(store *sites.Store) http.HandlerFunc {
 			return
 		}
 		if err := store.Delete(r.Context(), site.Name); err != nil {
-			slog.Error("delete site", "site", site.Name, "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			httpx.InternalError(w, "delete site", err, "site", site.Name)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -115,8 +109,7 @@ func renameSite(store *sites.Store) http.HandlerFunc {
 		var body struct {
 			Name string `json:"name"`
 		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&body); err != nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
+		if !httpx.ReadJSON(w, r, &body) {
 			return
 		}
 		to := strings.ToLower(strings.TrimSpace(body.Name))
@@ -134,8 +127,7 @@ func renameSite(store *sites.Store) http.HandlerFunc {
 		case errors.Is(err, sites.ErrNotFound):
 			http.NotFound(w, r) // deleted in the meantime
 		case err != nil:
-			slog.Error("rename site", "site", site.Name, "to", to, "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			httpx.InternalError(w, "rename site", err, "site", site.Name, "to", to)
 		default:
 			w.WriteHeader(http.StatusNoContent)
 		}

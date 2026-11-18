@@ -16,7 +16,7 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
-// Creates and opens the db in dir and applies any pending migrations
+// Open opens the database in dir, creating it if needed, and applies any pending migrations
 func Open(ctx context.Context, dir string) (*sql.DB, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err

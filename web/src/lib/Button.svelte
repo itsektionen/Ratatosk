@@ -46,7 +46,6 @@
 		--fill: var(--color-destructive);
 	}
 
-	/* Invert instantly */
 	.btn:hover:not(:disabled, [aria-disabled="true"]),
 	.btn:focus-visible {
 		background: var(--fill);

@@ -39,12 +39,11 @@ func Run(addr string, h http.Handler) error {
 
 	select {
 	case err := <-serverErr:
-		return err // the server died by itself
+		return err
 	case <-ctx.Done():
 		slog.Info("stop signal received, shutting down")
 	}
 
-	// Ongoing requests have 15 seconds to finish
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)

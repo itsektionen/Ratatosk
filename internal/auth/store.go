@@ -56,7 +56,6 @@ func (a *Auth) upsertOIDCUser(ctx context.Context, sub, name string, role Role) 
 	return toUser(r.ID, r.Name, r.Role), err
 }
 
-// invitedBy is the creator of the invite link
 func (a *Auth) createGuest(ctx context.Context, invitedBy sql.NullInt64, name string) (User, error) {
 	r, err := a.q.CreateGuest(ctx, authdb.CreateGuestParams{
 		Name:      name,
@@ -67,21 +66,18 @@ func (a *Auth) createGuest(ctx context.Context, invitedBy sql.NullInt64, name st
 	return toUser(r.ID, r.Name, r.Role), err
 }
 
-const sessionTTL = 30 * 24 * time.Hour
-
-func (a *Auth) createSession(ctx context.Context, userID int64) (string, time.Time, error) {
+func (a *Auth) createSession(ctx context.Context, userID int64) (string, error) {
 	token, hash := newToken()
 	now := time.Now()
-	expires := now.Add(sessionTTL)
-	// Expired rows are useless. Clean them up as we go
+	// Clean up expired rows as we go
 	a.q.DeleteExpiredSessions(ctx, now.Unix())
 	a.q.DeleteExpiredInvites(ctx, now.Unix())
 	err := a.q.CreateSession(ctx, authdb.CreateSessionParams{
 		TokenHash: hash,
 		UserID:    userID,
-		ExpiresAt: expires.Unix(),
+		ExpiresAt: now.Add(sessionTTL).Unix(),
 	})
-	return token, expires, err
+	return token, err
 }
 
 func (a *Auth) sessionUser(ctx context.Context, token string) (User, error) {
@@ -96,8 +92,8 @@ func (a *Auth) deleteSession(ctx context.Context, token string) error {
 	return a.q.DeleteSession(ctx, hashToken(token))
 }
 
-// Makes a new link token.
-// If forUser is set it signs another device in as them. Otherwise a new guest is created.
+// createInvite makes a link token. If forUser is set it is a share link that
+// signs in as them, otherwise it is a guest invite
 func (a *Auth) createInvite(ctx context.Context, createdBy, forUser int64, ttl time.Duration) (string, time.Time, error) {
 	token, hash := newToken()
 	expires := time.Now().Add(ttl)
@@ -110,28 +106,16 @@ func (a *Auth) createInvite(ctx context.Context, createdBy, forUser int64, ttl t
 	return token, expires, err
 }
 
-// inviteNeedsName reports whether redeeming the link makes a new guest, who must pick a nickname.
-// A share link signs in an existing user, who already has a name
-func (a *Auth) inviteNeedsName(ctx context.Context, token string) (bool, error) {
-	inv, err := a.getInvite(ctx, token)
-	return err == nil && !inv.UserID.Valid, err
-}
-
-func (a *Auth) getInvite(ctx context.Context, token string) (authdb.GetInviteRow, error) {
+// redeemInvite returns the user the link signs in. For a guest invite that is a new guest
+// called name, and errNickname if name is unfit. Share links ignore name
+func (a *Auth) redeemInvite(ctx context.Context, token, name string) (User, error) {
 	inv, err := a.q.GetInvite(ctx, authdb.GetInviteParams{
 		TokenHash: hashToken(token),
 		Now:       time.Now().Unix(),
 	})
 	if errors.Is(err, sql.ErrNoRows) {
-		return inv, errInvalid
+		return User{}, errInvalid
 	}
-	return inv, err
-}
-
-// redeemInvite returns the user the link signs in. For a guest invite that is a new guest
-// called name, which is ignored for share links
-func (a *Auth) redeemInvite(ctx context.Context, token, name string) (User, error) {
-	inv, err := a.getInvite(ctx, token)
 	if err != nil {
 		return User{}, err
 	}

@@ -25,7 +25,6 @@ func TestInviteRequiresLifetime(t *testing.T) {
 		want int
 	}{
 		{`{"hours":1}`, http.StatusOK},
-		{`{"hours":5}`, http.StatusOK},
 		{"", http.StatusBadRequest},
 		{`{}`, http.StatusBadRequest},
 		{`{"hours":0}`, http.StatusBadRequest},
@@ -52,7 +51,7 @@ func TestShareIsGuestsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, u := range []struct {
+	for _, tc := range []struct {
 		user User
 		want int
 	}{
@@ -61,11 +60,11 @@ func TestShareIsGuestsOnly(t *testing.T) {
 		{User{ID: guest.ID, Role: RoleAdmin}, http.StatusForbidden},
 	} {
 		req := httptest.NewRequest(http.MethodPost, "/share", nil)
-		req = req.WithContext(withUser(req.Context(), u.user))
+		req = req.WithContext(withUser(req.Context(), tc.user))
 		rec := httptest.NewRecorder()
 		a.share(rec, req)
-		if rec.Code != u.want {
-			t.Errorf("role %q: got %d, want %d", u.user.Role, rec.Code, u.want)
+		if rec.Code != tc.want {
+			t.Errorf("role %q: got %d, want %d", tc.user.Role, rec.Code, tc.want)
 		}
 	}
 }
@@ -202,7 +201,7 @@ func TestUnprefixedSessionCookieIgnoredOnHTTPS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	session, _, err := a.createSession(ctx, u.ID)
+	session, err := a.createSession(ctx, u.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,8 +20,6 @@
 			sites.baseDomain = boot.baseDomain;
 		} catch {
 			auth.user = null;
-		} finally {
-			sites.ready = true;
 		}
 	});
 </script>

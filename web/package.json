@@ -4,7 +4,6 @@
 	"private": true,
 	"type": "module",
 	"imports": {
-		"#lib": "./src/lib/index.js",
 		"#global.css": "./src/lib/global.css",
 		"#lib/*": "./src/lib/*"
 	},

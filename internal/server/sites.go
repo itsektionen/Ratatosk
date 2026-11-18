@@ -67,7 +67,6 @@ func serveSite(w http.ResponseWriter, r *http.Request, root *os.Root) {
 func serveNotFound(w http.ResponseWriter, root *os.Root) {
 	f, err := root.Open("404.html")
 	if err != nil {
-		// Fallback 404 if the site has none
 		http.Error(w, "404 page not found", http.StatusNotFound)
 		return
 	}

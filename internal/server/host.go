@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Returns the request host, lowercased and without port
+// Hostname returns the request host, lowercased and without port or trailing dot
 func Hostname(r *http.Request) string {
 	host := r.Host
 	if h, _, err := net.SplitHostPort(host); err == nil {

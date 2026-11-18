@@ -1,10 +1,11 @@
-import type { User } from "#lib/auth.svelte.ts";
+import { api } from "#lib/api.ts";
+import type { Role, User } from "#lib/auth.svelte.ts";
 
 export interface Site {
 	name: string;
 	url: string;
 	owner: string | null;
-	ownerRole: "admin" | "member" | "guest" | "";
+	ownerRole: Role | "";
 	canEdit: boolean;
 }
 
@@ -28,9 +29,7 @@ export async function loadBoot(): Promise<Boot> {
 		tag.remove();
 		return boot;
 	}
-	const res = await fetch("/api/boot");
-	if (!res.ok) throw new Error(await res.text());
-	return res.json();
+	return (await api("/api/boot")).json();
 }
 
 /** Guests pick their own nickname, so they are marked to not pass as real accounts */

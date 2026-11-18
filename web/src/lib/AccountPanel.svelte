@@ -7,6 +7,7 @@
 	import DevIcon from "~icons/ph/terminal-window-fill";
 	import SignInIcon from "~icons/ph/sign-in-fill";
 	import SignOutIcon from "~icons/ph/sign-out-fill";
+	import { errorText } from "#lib/api.ts";
 	import Button from "#lib/Button.svelte";
 	import { getAuth, type Link } from "#lib/auth.svelte.ts";
 	import { getSites } from "#lib/sites.svelte.ts";
@@ -45,7 +46,7 @@
 		try {
 			link = await auth.createLink(mode, mode === "invites" ? hours : undefined);
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			error = errorText(e);
 		}
 	}
 
