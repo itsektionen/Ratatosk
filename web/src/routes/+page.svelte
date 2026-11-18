@@ -3,6 +3,7 @@
 	import { getAuth } from "#lib/auth.svelte.ts";
 	import Button from "#lib/Button.svelte";
 	import Dropzone from "#lib/Dropzone.svelte";
+	import JoinModal from "#lib/JoinModal.svelte";
 	import SiteCard from "#lib/SiteCard.svelte";
 	import { setEditor } from "#lib/editor.svelte.ts";
 
@@ -80,3 +81,5 @@
 		{/each}
 	</section>
 </main>
+
+<JoinModal />

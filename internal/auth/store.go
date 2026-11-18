@@ -7,12 +7,28 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/itsektionen/ratatosk/internal/auth/authdb"
 )
 
-var errInvalid = errors.New("invalid or expired token")
+var (
+	errInvalid  = errors.New("invalid or expired token")
+	errNickname = errors.New("nickname must be 1 to 32 characters")
+)
+
+// cleanNickname trims name and checks that it is fit to show to others
+func cleanNickname(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	n := utf8.RuneCountInString(name)
+	if n < 1 || n > 32 || strings.IndexFunc(name, unicode.IsControl) >= 0 {
+		return "", errNickname
+	}
+	return name, nil
+}
 
 func newToken() (token string, hash []byte) {
 	b := make([]byte, 32)
@@ -41,9 +57,9 @@ func (a *Auth) upsertOIDCUser(ctx context.Context, sub, name string, role Role) 
 }
 
 // invitedBy is the creator of the invite link
-func (a *Auth) createGuest(ctx context.Context, invitedBy sql.NullInt64) (User, error) {
+func (a *Auth) createGuest(ctx context.Context, invitedBy sql.NullInt64, name string) (User, error) {
 	r, err := a.q.CreateGuest(ctx, authdb.CreateGuestParams{
-		Name:      "Guest",
+		Name:      name,
 		Role:      string(RoleGuest),
 		InvitedBy: invitedBy,
 		CreatedAt: time.Now().Unix(),
@@ -94,19 +110,37 @@ func (a *Auth) createInvite(ctx context.Context, createdBy, forUser int64, ttl t
 	return token, expires, err
 }
 
-func (a *Auth) redeemInvite(ctx context.Context, token string) (User, error) {
+// inviteNeedsName reports whether redeeming the link makes a new guest, who must pick a nickname.
+// A share link signs in an existing user, who already has a name
+func (a *Auth) inviteNeedsName(ctx context.Context, token string) (bool, error) {
+	inv, err := a.getInvite(ctx, token)
+	return err == nil && !inv.UserID.Valid, err
+}
+
+func (a *Auth) getInvite(ctx context.Context, token string) (authdb.GetInviteRow, error) {
 	inv, err := a.q.GetInvite(ctx, authdb.GetInviteParams{
 		TokenHash: hashToken(token),
 		Now:       time.Now().Unix(),
 	})
 	if errors.Is(err, sql.ErrNoRows) {
-		return User{}, errInvalid
+		return inv, errInvalid
 	}
+	return inv, err
+}
+
+// redeemInvite returns the user the link signs in. For a guest invite that is a new guest
+// called name, which is ignored for share links
+func (a *Auth) redeemInvite(ctx context.Context, token, name string) (User, error) {
+	inv, err := a.getInvite(ctx, token)
 	if err != nil {
 		return User{}, err
 	}
 	if !inv.UserID.Valid {
-		return a.createGuest(ctx, inv.CreatedBy)
+		name, err := cleanNickname(name)
+		if err != nil {
+			return User{}, err
+		}
+		return a.createGuest(ctx, inv.CreatedBy, name)
 	}
 	r, err := a.q.GetUser(ctx, inv.UserID.Int64)
 	return toUser(r.ID, r.Name, r.Role), err

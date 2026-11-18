@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"math"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -24,6 +26,7 @@ func (a *Auth) Handler() http.Handler {
 	r.Get("/login", a.login)
 	r.Get("/callback", a.callback)
 	r.Get("/join", a.join)
+	r.Post("/join", a.joinAsGuest)
 	r.Post("/logout", a.logout)
 	r.With(RequireInviter).Post("/invites", a.invite)
 	r.With(RequireUser).Post("/share", a.share)
@@ -39,33 +42,47 @@ func writeJSON(w http.ResponseWriter, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// startSession signs the browser in as u and sends it to the UI
-func (a *Auth) startSession(w http.ResponseWriter, r *http.Request, u User) {
+// signIn gives the browser a session as u. It writes the error response and
+// returns false if that fails
+func (a *Auth) signIn(w http.ResponseWriter, r *http.Request, u User) bool {
 	token, expires, err := a.createSession(r.Context(), u.ID)
 	if err != nil {
 		slog.Error("create session", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return false
 	}
 	a.setSessionCookie(w, token, expires)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	return true
 }
 
-// me reports who is signed in. user is null when nobody is
-func (a *Auth) me(w http.ResponseWriter, r *http.Request) {
-	resp := struct {
-		User         *User `json:"user"`
-		LoginEnabled bool  `json:"loginEnabled"`
-		DevLogin     bool  `json:"devLogin"`
-	}{LoginEnabled: a.oidc != nil, DevLogin: a.cfg.DevLogin}
-	if u, ok := FromContext(r.Context()); ok {
-		resp.User = &u
+// startSession signs the browser in as u and sends it to the UI
+func (a *Auth) startSession(w http.ResponseWriter, r *http.Request, u User) {
+	if a.signIn(w, r, u) {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
-	writeJSON(w, resp)
+}
+
+// Me is who is signed in, and how others can sign in
+type Me struct {
+	User         *User `json:"user"` // null when nobody is
+	LoginEnabled bool  `json:"loginEnabled"`
+	DevLogin     bool  `json:"devLogin"`
+}
+
+func (a *Auth) Me(ctx context.Context) Me {
+	me := Me{LoginEnabled: a.oidc != nil, DevLogin: a.cfg.DevLogin}
+	if u, ok := FromContext(ctx); ok {
+		me.User = &u
+	}
+	return me
+}
+
+func (a *Auth) me(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, a.Me(r.Context()))
 }
 
 func (a *Auth) logout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(sessionCookie); err == nil {
+	if c, err := r.Cookie(a.cookieName(sessionCookie)); err == nil {
 		a.deleteSession(r.Context(), c.Value)
 	}
 	a.clearSessionCookie(w)
@@ -113,19 +130,56 @@ func (a *Auth) respondWithLink(w http.ResponseWriter, r *http.Request, createdBy
 	}{a.cfg.PublicURL + "/api/auth/join?token=" + token, expires})
 }
 
-// join redeems an invite or share link, which is what the QR code points at
+// join is what invite and share links point at. A share link signs in right away.
+// A guest invite first sends the browser to the UI to ask for a nickname,
+// which joinAsGuest then gets along with the token
 func (a *Auth) join(w http.ResponseWriter, r *http.Request) {
-	u, err := a.redeemInvite(r.Context(), r.URL.Query().Get("token"))
-	if errors.Is(err, errInvalid) {
-		http.Error(w, "this link is invalid or has expired", http.StatusGone)
+	token := r.URL.Query().Get("token")
+	needsName, err := a.inviteNeedsName(r.Context(), token)
+	if needsName {
+		http.Redirect(w, r, "/?invite="+url.QueryEscape(token), http.StatusSeeOther)
 		return
 	}
+	if err == nil {
+		var u User
+		if u, err = a.redeemInvite(r.Context(), token, ""); err == nil {
+			a.startSession(w, r, u)
+			return
+		}
+	}
+	a.joinError(w, err)
+}
+
+// joinAsGuest redeems a guest invite for a new guest with the given nickname
+func (a *Auth) joinAsGuest(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token string `json:"token"`
+		Name  string `json:"name"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	u, err := a.redeemInvite(r.Context(), body.Token, body.Name)
 	if err != nil {
+		a.joinError(w, err)
+		return
+	}
+	if a.signIn(w, r, u) {
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (a *Auth) joinError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errInvalid):
+		http.Error(w, "this link is invalid or has expired", http.StatusGone)
+	case errors.Is(err, errNickname):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	default:
 		slog.Error("redeem invite", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
 	}
-	a.startSession(w, r, u)
 }
 
 func (a *Auth) devLogin(w http.ResponseWriter, r *http.Request) {

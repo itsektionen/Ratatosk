@@ -8,16 +8,27 @@ import (
 
 const sessionCookie = "ratatosk_session"
 
-// The cookie has no Domain attribute, so browsers only send it to the app's own
-// host and never to <site>.BASE_DOMAIN, where uploaded (untrusted) JS runs
+func (a *Auth) secure() bool {
+	return strings.HasPrefix(a.cfg.PublicURL, "https://")
+}
+
+// cookieName adds the __Host- prefix on https. It makes browsers refuse a cookie
+// that a site on a subdomain sets for the whole domain, so a site can't replace ours
+func (a *Auth) cookieName(name string) string {
+	if a.secure() {
+		return "__Host-" + name
+	}
+	return name
+}
+
 func (a *Auth) setSessionCookie(w http.ResponseWriter, token string, expires time.Time) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookie,
+		Name:     a.cookieName(sessionCookie),
 		Value:    token,
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: true,
-		Secure:   strings.HasPrefix(a.cfg.PublicURL, "https://"),
+		Secure:   a.secure(),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -26,10 +37,10 @@ func (a *Auth) clearSessionCookie(w http.ResponseWriter) {
 	a.setSessionCookie(w, "", time.Unix(0, 0))
 }
 
-// Middleware loads the signed-in user, if any, into the request context
+// Loads the signed-in user, if any, into the request context
 func (a *Auth) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if c, err := r.Cookie(sessionCookie); err == nil {
+		if c, err := r.Cookie(a.cookieName(sessionCookie)); err == nil {
 			if u, err := a.sessionUser(r.Context(), c.Value); err == nil {
 				r = r.WithContext(withUser(r.Context(), u))
 			}

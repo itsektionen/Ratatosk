@@ -13,10 +13,10 @@ import (
 
 func Handler(cfg config.Config, a *auth.Auth) http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer)
+	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer, denyFraming)
 
 	r.Route("/api", func(api chi.Router) {
-		api.Use(a.Middleware)
+		api.Use(a.Middleware, sameOriginOnly(cfg))
 		api.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "ok")
 		})

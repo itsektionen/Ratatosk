@@ -58,9 +58,12 @@ func TestRedeemInviteRecordsInviter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	guest, err := a.redeemInvite(ctx, token)
+	guest, err := a.redeemInvite(ctx, token, "Nick")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if guest.Name != "Nick" {
+		t.Errorf("name=%q, want %q", guest.Name, "Nick")
 	}
 	if guest.Role != RoleGuest {
 		t.Fatalf("role=%q, want %q", guest.Role, RoleGuest)
@@ -96,7 +99,7 @@ func TestRedeemShareLinkCreatesNoUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := a.redeemInvite(ctx, token)
+	got, err := a.redeemInvite(ctx, token, "")
 	if err != nil {
 		t.Fatal(err)
 	}

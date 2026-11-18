@@ -4,12 +4,18 @@ services:
     restart: unless-stopped
     environment:
       BASE_DOMAIN: ${BASE_DOMAIN:?set BASE_DOMAIN in .env}
+      PUBLIC_URL: https://${BASE_DOMAIN}
+      OIDC_ISSUER:
+      OIDC_CLIENT_ID:
+      OIDC_CLIENT_SECRET:
+      OIDC_ADMIN_GROUPS:
       # Passed through from .env only if set there, defaults are in config.go
       MAX_UPLOAD:
       MAX_UNZIPPED:
       MAX_FILES:
     volumes:
       - sites:/var/www/html
+      - data:/data
     networks:
       - traefik
     labels:
@@ -22,6 +28,7 @@ services:
 
 volumes:
   sites:
+  data:
 
 networks:
   traefik:

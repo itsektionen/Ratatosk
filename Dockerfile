@@ -13,11 +13,12 @@ COPY . .
 COPY --from=web /src/web/build ./web/build
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /ratatosk .
 # The sites volume inherits this ownership on first mount
-RUN mkdir -p /sites
+RUN mkdir -p /sites /data
 
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /ratatosk /ratatosk
 COPY --from=build --chown=nonroot:nonroot /sites /var/www/html
-ENV ADDR=:8000 SITES_DIR=/var/www/html
+COPY --from=build --chown=nonroot:nonroot /data /data
+ENV ADDR=:8000 SITES_DIR=/var/www/html DATA_DIR=/data
 EXPOSE 8000
 ENTRYPOINT ["/ratatosk"]
