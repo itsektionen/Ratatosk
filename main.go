@@ -53,10 +53,15 @@ func newApp(cfg config.Config) http.Handler {
 		os.Exit(1)
 	}
 	sites.PrepareDir(cfg.SitesDir)
+	store := sites.NewStore(database, cfg)
+	if err := store.Adopt(ctx); err != nil {
+		slog.Error("adopt existing sites", "err", err)
+		os.Exit(1)
+	}
 	a, err := auth.New(ctx, cfg, database)
 	if err != nil {
 		slog.Error("set up auth", "err", err)
 		os.Exit(1)
 	}
-	return app.Handler(cfg, a)
+	return app.Handler(cfg, a, store)
 }

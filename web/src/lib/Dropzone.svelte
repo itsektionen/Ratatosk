@@ -1,5 +1,9 @@
 <script lang="ts">
-	let { name, required = false }: { name: string; required?: boolean } = $props();
+	let {
+		name,
+		required = false,
+		accept,
+	}: { name: string; required?: boolean; accept?: string } = $props();
 
 	let dragging = $state(false);
 	let filename = $state<string | null>(null);
@@ -17,6 +21,7 @@
 		type="file"
 		{name}
 		{required}
+		{accept}
 		class="absolute inset-0 size-full cursor-pointer opacity-0"
 		ondragenter={() => (dragging = true)}
 		ondragleave={() => (dragging = false)}

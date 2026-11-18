@@ -13,7 +13,7 @@
 	}: {
 		subdomain: string;
 		url: string;
-		author: string;
+		author?: string;
 		onupdate?: () => void;
 		ondelete?: () => void;
 	} = $props();
@@ -48,7 +48,9 @@
 			class="flex min-w-0 flex-1 items-baseline gap-2 px-1 text-foreground no-underline after:absolute after:inset-0"
 		>
 			<span class="truncate text-sm leading-6 font-medium">{subdomain}</span>
-			<span class="truncate text-xs text-muted-foreground">by {author}</span>
+			{#if author}
+				<span class="truncate text-xs text-muted-foreground">by {author}</span>
+			{/if}
 		</a>
 		{#if onupdate}
 			<Button
@@ -77,7 +79,8 @@
 			src={url}
 			title="Preview of {subdomain}"
 			loading="lazy"
-			sandbox=""
+			// No allow-same-origin, so a site can't touch our cookies. The server allows it to fetch its own files
+			sandbox="allow-scripts"
 			width={PREVIEW_W}
 			height={PREVIEW_H}
 			style:transform="scale({previewWidth / PREVIEW_W})"

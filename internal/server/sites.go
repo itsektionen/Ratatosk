@@ -16,6 +16,9 @@ import (
 
 func Sites(cfg config.Config) http.Handler {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Sites are public files. Previews run sandboxed, with no origin of their own, and
+		// need this to load their own files with fetch(), fonts and p5's loadImage()
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

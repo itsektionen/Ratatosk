@@ -4,11 +4,20 @@
 	import CloseIcon from "~icons/ph/x-bold";
 	import DeviceIcon from "~icons/ph/devices-fill";
 	import InviteIcon from "~icons/ph/user-plus-fill";
+	import DevIcon from "~icons/ph/terminal-window-fill";
+	import SignInIcon from "~icons/ph/sign-in-fill";
 	import SignOutIcon from "~icons/ph/sign-out-fill";
 	import Button from "#lib/Button.svelte";
 	import { getAuth, type Link } from "#lib/auth.svelte.ts";
+	import { getSites } from "#lib/sites.svelte.ts";
 
 	const auth = getAuth();
+	const sites = getSites();
+
+	async function logout() {
+		await auth.logout();
+		sites.refresh().catch(() => {}); // edit rights are gone
+	}
 
 	type Mode = "invites" | "share";
 	const durations = [
@@ -83,7 +92,7 @@
 				class="size-8 shrink-0"
 				title="Sign out"
 				aria-label="Sign out"
-				onclick={() => auth.logout()}
+				onclick={logout}
 			>
 				<SignOutIcon />
 			</Button>
@@ -190,12 +199,21 @@
 			{/if}
 		</div>
 		{#if auth.loginEnabled}
-			<Button href="/api/auth/login" data-sveltekit-reload class="px-3 py-1 text-sm">Sign in</Button
+			<Button
+				href="/api/auth/login"
+				data-sveltekit-reload
+				class="size-8 shrink-0"
+				title="Sign in"
+				aria-label="Sign in"
 			>
+				<SignInIcon />
+			</Button>
 		{/if}
 		{#if auth.devLogin}
 			<form method="POST" action="/api/auth/dev-login">
-				<Button type="submit" class="px-3 py-1 text-sm">Dev login</Button>
+				<Button type="submit" class="size-8 shrink-0" title="Dev login" aria-label="Dev login">
+					<DevIcon />
+				</Button>
 			</form>
 		{/if}
 	</div>

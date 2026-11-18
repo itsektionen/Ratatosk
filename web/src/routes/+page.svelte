@@ -1,15 +1,19 @@
 <script lang="ts">
 	import AccountPanel from "#lib/AccountPanel.svelte";
 	import { getAuth } from "#lib/auth.svelte.ts";
+	import { authorOf } from "#lib/boot.ts";
 	import Button from "#lib/Button.svelte";
 	import Dropzone from "#lib/Dropzone.svelte";
 	import JoinModal from "#lib/JoinModal.svelte";
 	import SiteCard from "#lib/SiteCard.svelte";
 	import { setEditor } from "#lib/editor.svelte.ts";
+	import { getSites } from "#lib/sites.svelte.ts";
 
-	// TODO: Dynamic domain name
+	// A page or an archive of the site, the server also checks
+	const SITE_FILES = ".html,.htm,.zip,.tar,.tar.gz,.tgz";
 
 	const auth = getAuth();
+	const sites = getSites();
 	const editor = setEditor();
 	editor.syncHash();
 
@@ -18,6 +22,39 @@
 	function edit(subdomain: string) {
 		editor.subdomain = subdomain;
 		subdomainInput?.focus();
+	}
+
+	let uploading = $state(false);
+	let message = $state<{ error: boolean; text: string } | null>(null);
+
+	const fail = (e: unknown) => ({ error: true, text: e instanceof Error ? e.message : String(e) });
+
+	async function upload(e: SubmitEvent & { currentTarget: HTMLFormElement }) {
+		e.preventDefault();
+		uploading = true;
+		message = null;
+		try {
+			const res = await fetch("/api/upload", {
+				method: "POST",
+				body: new FormData(e.currentTarget),
+			});
+			if (!res.ok) throw new Error((await res.text()).trim());
+			await sites.refresh();
+			message = { error: false, text: "Uploaded" };
+		} catch (e) {
+			message = fail(e);
+		} finally {
+			uploading = false;
+		}
+	}
+
+	async function remove(name: string) {
+		if (!confirm(`Delete ${name}?`)) return;
+		try {
+			await sites.remove(name);
+		} catch (e) {
+			message = fail(e);
+		}
 	}
 </script>
 
@@ -31,12 +68,7 @@
 		<div class="p-4">
 			<AccountPanel />
 		</div>
-		<form
-			method="POST"
-			action="/api/upload"
-			enctype="multipart/form-data"
-			class="flex flex-col gap-4 p-4"
-		>
+		<form onsubmit={upload} class="flex flex-col gap-4 p-4">
 			<label
 				class={[
 					"flex items-center border border-edge px-3",
@@ -55,12 +87,22 @@
 					spellcheck="false"
 					class="min-w-0 flex-1 border-0 px-0 text-right focus:ring-0"
 				/>
-				<span class="text-muted-foreground select-none">.tvs.kth.it</span>
+				<span class="text-muted-foreground select-none">.{sites.baseDomain}</span>
 			</label>
-			<Dropzone name="file" />
-			<Button type="submit" variant="primary" disabled={!auth.user} class="px-4 py-2 font-medium">
+			<Dropzone name="file" accept={SITE_FILES} />
+			<Button
+				type="submit"
+				variant="primary"
+				disabled={!auth.user || uploading}
+				class="px-4 py-2 font-medium"
+			>
 				Upload
 			</Button>
+			{#if message}
+				<p class={["text-sm", message.error ? "text-destructive" : "text-muted-foreground"]}>
+					{message.text}
+				</p>
+			{/if}
 		</form>
 	</aside>
 
@@ -70,13 +112,13 @@
 			"content-start gap-4 p-4",
 		]}
 	>
-		{#each Array(10) as _, i (i)}
+		{#each sites.list as site (site.name)}
 			<SiteCard
-				subdomain="example"
-				url="https://example.com"
-				author="Someone"
-				onupdate={() => edit("example")}
-				ondelete={() => {}}
+				subdomain={site.name}
+				url={site.url}
+				author={authorOf(site)}
+				onupdate={site.canEdit ? () => edit(site.name) : undefined}
+				ondelete={site.canEdit ? () => remove(site.name) : undefined}
 			/>
 		{/each}
 	</section>

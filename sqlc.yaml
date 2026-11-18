@@ -7,3 +7,10 @@ sql:
       go:
         package: authdb
         out: internal/auth/authdb
+  - engine: sqlite
+    schema: internal/db/migrations
+    queries: internal/sites/queries.sql
+    gen:
+      go:
+        package: sitesdb
+        out: internal/sites/sitesdb

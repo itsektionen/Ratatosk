@@ -21,17 +21,10 @@ export class Auth {
 	/** Guests only, everyone else signs in through SSO */
 	canShare = $derived(this.user?.role === "guest");
 
-	async refresh() {
-		try {
-			const res = await fetch("/api/auth/me");
-			if (!res.ok) throw new Error(res.statusText);
-			const me = await res.json();
-			this.user = me.user;
-			this.loginEnabled = me.loginEnabled;
-			this.devLogin = me.devLogin;
-		} catch {
-			this.user = null;
-		}
+	apply(me: { user: User | null; loginEnabled: boolean; devLogin: boolean }) {
+		this.user = me.user;
+		this.loginEnabled = me.loginEnabled;
+		this.devLogin = me.devLogin;
 	}
 
 	async logout() {
