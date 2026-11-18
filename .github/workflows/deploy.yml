@@ -1,0 +1,19 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-and-deploy-with-rhyolite:
+    permissions:
+      contents: read
+      packages: write
+    uses: itsektionen/andesite/.github/workflows/v1.yml@main
+    secrets:
+      RHYOLITE_TOKEN: ${{ secrets.RHYOLITE_TOKEN }}
+    with:
+      deploy-dir: ratatosk
+      deploy-with: rhyolite
+      cache: "gha"
+      gha-mode: "max"
